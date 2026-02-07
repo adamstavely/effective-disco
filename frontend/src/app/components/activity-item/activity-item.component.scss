@@ -1,21 +1,23 @@
+@import '../../../styles/tokens';
+
 .activity-item {
   display: flex;
   align-items: flex-start;
-  gap: 0.75rem;
-  padding: 0.5rem;
-  border-radius: 4px;
-  transition: background 0.2s;
+  gap: var(--spacing-3);
+  padding: var(--spacing-2);
+  border-radius: var(--radius-md);
+  transition: background var(--transition-fast);
 
   &:hover {
-    background: #f5f5f5;
+    background: var(--color-neutral-100);
   }
 }
 
 .activity-dot {
   width: 8px;
   height: 8px;
-  border-radius: 50%;
-  background: #2196f3;
+  border-radius: var(--radius-full);
+  background: var(--color-primary-500);
   margin-top: 0.3rem;
   flex-shrink: 0;
 }
@@ -23,17 +25,17 @@
 .activity-content {
   display: flex;
   flex-direction: column;
-  gap: 0.25rem;
+  gap: var(--spacing-1);
   flex: 1;
 }
 
 .activity-text {
-  font-size: 0.85rem;
-  color: #333;
-  line-height: 1.4;
+  font-size: var(--font-size-md);
+  color: var(--color-neutral-700);
+  line-height: var(--line-height-normal);
 }
 
 .activity-time {
-  font-size: 0.75rem;
-  color: #999;
+  font-size: var(--font-size-sm);
+  color: var(--color-neutral-500);
 }

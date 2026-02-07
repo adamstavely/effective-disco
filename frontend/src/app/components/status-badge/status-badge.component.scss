@@ -1,0 +1,49 @@
+@import '../../../styles/tokens';
+
+.status-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--spacing-2);
+  font-size: var(--font-size-sm);
+  font-weight: var(--font-weight-semibold);
+  padding: var(--spacing-1) var(--spacing-2);
+  border-radius: var(--radius-md);
+}
+
+.status-dot {
+  width: 6px;
+  height: 6px;
+  border-radius: var(--radius-full);
+  display: inline-block;
+}
+
+.status-idle .status-dot {
+  background: var(--color-neutral-500);
+}
+
+.status-active .status-dot,
+.status-working .status-dot {
+  background: var(--color-status-success);
+}
+
+.status-blocked .status-dot {
+  background: var(--color-status-error);
+}
+
+.status-text {
+  text-transform: uppercase;
+  letter-spacing: var(--letter-spacing-tight);
+}
+
+.status-idle .status-text {
+  color: var(--color-neutral-500);
+}
+
+.status-active .status-text,
+.status-working .status-text {
+  color: var(--color-status-success);
+}
+
+.status-blocked .status-text {
+  color: var(--color-status-error);
+}

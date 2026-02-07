@@ -1,3 +1,5 @@
+@import '../../../styles/tokens';
+
 .agents-panel {
   display: flex;
   flex-direction: column;
@@ -8,27 +10,27 @@
   display: flex;
   justify-content: space-between;
   align-items: center;
-  padding-bottom: 1rem;
-  border-bottom: 1px solid #e0e0e0;
-  margin-bottom: 1rem;
+  padding-bottom: var(--spacing-4);
+  border-bottom: var(--border-width) var(--border-style) var(--border-color);
+  margin-bottom: var(--spacing-4);
 
   h2 {
-    font-size: 0.9rem;
-    font-weight: 600;
-    letter-spacing: 0.1em;
-    color: #666;
+    font-size: var(--font-size-lg);
+    font-weight: var(--font-weight-semibold);
+    letter-spacing: var(--letter-spacing-normal);
+    color: var(--color-neutral-600);
   }
 
   .count {
-    font-size: 0.85rem;
-    color: #999;
+    font-size: var(--font-size-md);
+    color: var(--color-neutral-500);
   }
 }
 
 .agents-list {
   display: flex;
   flex-direction: column;
-  gap: 0.5rem;
+  gap: var(--spacing-2);
   overflow-y: auto;
   flex: 1;
 }

@@ -1,47 +1,49 @@
+@import '../../../styles/tokens';
+
 .task-card {
-  background: white;
-  border: 1px solid #e0e0e0;
-  border-radius: 6px;
-  padding: 0.75rem;
+  background: var(--color-neutral-0);
+  border: var(--border-width) var(--border-style) var(--border-color);
+  border-radius: var(--radius-lg);
+  padding: var(--spacing-3);
   cursor: pointer;
-  transition: all 0.2s;
+  transition: all var(--transition-fast);
 
   &:hover {
-    border-color: #999;
-    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+    border-color: var(--color-neutral-500);
+    box-shadow: var(--shadow-md);
   }
 }
 
 .task-title {
-  font-weight: 600;
-  font-size: 0.9rem;
-  color: #333;
-  margin-bottom: 0.5rem;
+  font-weight: var(--font-weight-semibold);
+  font-size: var(--font-size-lg);
+  color: var(--color-neutral-700);
+  margin-bottom: var(--spacing-2);
 }
 
 .task-description {
-  font-size: 0.8rem;
-  color: #666;
-  line-height: 1.4;
-  margin-bottom: 0.75rem;
+  font-size: var(--font-size-base);
+  color: var(--color-neutral-600);
+  line-height: var(--line-height-normal);
+  margin-bottom: var(--spacing-3);
 }
 
 .task-meta {
   display: flex;
   flex-direction: column;
-  gap: 0.5rem;
-  margin-bottom: 0.5rem;
+  gap: var(--spacing-2);
+  margin-bottom: var(--spacing-2);
 }
 
 .task-age {
-  font-size: 0.75rem;
-  color: #999;
+  font-size: var(--font-size-sm);
+  color: var(--color-neutral-500);
 }
 
 .task-tags {
   display: flex;
   flex-wrap: wrap;
-  gap: 0.25rem;
+  gap: var(--spacing-1);
 }
 
 .task-footer {
@@ -50,7 +52,7 @@
 }
 
 .expand-icon {
-  font-size: 0.7rem;
-  color: #999;
+  font-size: var(--font-size-xs);
+  color: var(--color-neutral-500);
   cursor: pointer;
 }

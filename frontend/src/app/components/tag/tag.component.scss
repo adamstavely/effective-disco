@@ -1,0 +1,11 @@
+@import '../../../styles/tokens';
+
+.tag {
+  display: inline-block;
+  font-size: var(--font-size-xs);
+  padding: var(--spacing-1) var(--spacing-2);
+  background: var(--color-neutral-200);
+  color: var(--color-neutral-600);
+  border-radius: var(--radius-sm);
+  font-weight: var(--font-weight-medium);
+}
