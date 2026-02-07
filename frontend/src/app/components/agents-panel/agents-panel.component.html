@@ -1,11 +1,11 @@
 <div class="agents-panel">
-  <div class="panel-header">
-    <h2>AGENTS</h2>
-    <span class="count">{{ agents.length }}</span>
-  </div>
+  <app-panel-header 
+    title="AGENTS" 
+    [count]="(agents$ | async)?.length">
+  </app-panel-header>
   <div class="agents-list">
     <app-agent-card
-      *ngFor="let agent of agents"
+      *ngFor="let agent of agents$ | async"
       [agent]="agent"
       [selected]="selectedAgentId === agent._id"
       (click)="selectAgent(agent._id)"

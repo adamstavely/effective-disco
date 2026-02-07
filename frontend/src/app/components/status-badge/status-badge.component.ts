@@ -1,4 +1,4 @@
-import { Component, Input } from '@angular/core';
+import { Component, Input, ChangeDetectionStrategy } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { AgentStatus } from '../../models/types';
 
@@ -7,7 +7,8 @@ import { AgentStatus } from '../../models/types';
   standalone: true,
   imports: [CommonModule],
   templateUrl: './status-badge.component.html',
-  styleUrl: './status-badge.component.scss'
+  styleUrl: './status-badge.component.scss',
+  changeDetection: ChangeDetectionStrategy.OnPush
 })
 export class StatusBadgeComponent {
   @Input() status!: AgentStatus | 'working';

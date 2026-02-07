@@ -1,20 +1,30 @@
 <div class="live-feed">
-  <div class="panel-header">
-    <h2>LIVE FEED</h2>
-  </div>
-  <div class="feed-filters">
-    <button
-      *ngFor="let filter of activityTypes"
-      class="filter-btn"
-      [class.active]="selectedFilter === filter"
-      (click)="setFilter(filter)"
-    >
-      {{ getFilterLabel(filter) }} ({{ getFilterCount(filter) }})
-    </button>
-  </div>
+  <app-panel-header title="LIVE FEED"></app-panel-header>
+  <ng-container *ngIf="activities$ | async as activities; else loading">
+    <div class="feed-filters">
+      <app-filter-button
+        *ngFor="let filter of activityTypes"
+        [label]="getFilterLabel(filter)"
+        [count]="getFilterCount(activities, filter)"
+        [active]="(selectedFilter$ | async) === filter"
+        (clicked)="setFilter(filter)"
+      ></app-filter-button>
+    </div>
+  </ng-container>
+  <ng-template #loading>
+    <div class="feed-filters">
+      <app-filter-button
+        *ngFor="let filter of activityTypes"
+        [label]="getFilterLabel(filter)"
+        [count]="0"
+        [active]="false"
+        (clicked)="setFilter(filter)"
+      ></app-filter-button>
+    </div>
+  </ng-template>
   <div class="activities-list">
     <app-activity-item
-      *ngFor="let activity of getFilteredActivities()"
+      *ngFor="let activity of filteredActivities$ | async"
       [activity]="activity"
     ></app-activity-item>
   </div>

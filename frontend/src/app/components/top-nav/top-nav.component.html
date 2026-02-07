@@ -4,19 +4,19 @@
   </div>
   <div class="nav-center">
     <div class="stat">
-      <span class="stat-value">{{ agentsActive }}</span>
+      <span class="stat-value">{{ agentsActive$ | async }}</span>
       <span class="stat-label">AGENTS ACTIVE</span>
     </div>
     <div class="stat">
-      <span class="stat-value">{{ tasksInQueue }}</span>
+      <span class="stat-value">{{ tasksInQueue$ | async }}</span>
       <span class="stat-label">TASKS IN QUEUE</span>
     </div>
   </div>
   <div class="nav-right">
     <button class="docs-btn">Docs</button>
-    <div class="timestamp">
-      <span class="time">{{ formatTime() }}</span>
-      <span class="date">{{ formatDate() }}</span>
+    <div class="timestamp" *ngIf="currentTime$ | async as currentTime">
+      <span class="time">{{ formatTime(currentTime) }}</span>
+      <span class="date">{{ formatDate(currentTime) }}</span>
     </div>
     <div class="status-indicator">
       <span class="status-dot"></span>

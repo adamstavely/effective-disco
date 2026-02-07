@@ -2,7 +2,7 @@
   <div class="task-title">{{ task.title }}</div>
   <div class="task-description">{{ getDescriptionSnippet() }}</div>
   <div class="task-meta">
-    <span class="task-age">{{ getTimeAgo() }}</span>
+    <span class="task-age">{{ task.createdAt | timeAgo }}</span>
     <div class="task-tags">
       <app-tag *ngFor="let tag of ['research', 'documentation']" [text]="tag"></app-tag>
     </div>

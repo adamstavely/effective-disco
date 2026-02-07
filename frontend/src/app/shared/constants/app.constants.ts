@@ -1,0 +1,45 @@
+import { TaskStatus, ActivityType } from '../../models/types';
+
+export const TASK_STATUS_LABELS: Record<TaskStatus, string> = {
+  inbox: 'INBOX',
+  assigned: 'ASSIGNED',
+  in_progress: 'IN PROGRESS',
+  review: 'REVIEW',
+  done: 'DONE',
+  blocked: 'BLOCKED'
+};
+
+export const ACTIVITY_TYPE_LABELS: Record<ActivityType | 'all', string> = {
+  all: 'All',
+  task_created: 'Tasks',
+  message_sent: 'Comments',
+  document_created: 'Docs',
+  task_assigned: 'Status',
+  status_changed: 'Status'
+};
+
+export const TASK_STATUS_COLORS: Record<TaskStatus, string> = {
+  inbox: 'warning',
+  assigned: 'warning',
+  in_progress: 'success',
+  review: 'warning',
+  done: 'success',
+  blocked: 'error'
+};
+
+export const TASK_STATUSES: TaskStatus[] = [
+  'inbox',
+  'assigned',
+  'in_progress',
+  'review',
+  'done',
+  'blocked'
+];
+
+export const KANBAN_STATUSES: TaskStatus[] = [
+  'inbox',
+  'assigned',
+  'in_progress',
+  'review',
+  'done'
+];

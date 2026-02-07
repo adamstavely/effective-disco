@@ -1,22 +1,8 @@
 @import '../../../styles/tokens';
+@import '../../../styles/shared';
 
 .mission-queue {
-  display: flex;
-  flex-direction: column;
-  height: 100%;
-}
-
-.panel-header {
-  padding-bottom: var(--spacing-4);
-  border-bottom: var(--border-width) var(--border-style) var(--border-color);
-  margin-bottom: var(--spacing-4);
-
-  h2 {
-    font-size: var(--font-size-lg);
-    font-weight: var(--font-weight-semibold);
-    letter-spacing: var(--letter-spacing-normal);
-    color: var(--color-neutral-600);
-  }
+  @extend .panel-container;
 }
 
 .kanban-board {

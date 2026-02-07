@@ -1,4 +1,4 @@
-import { Component, Input } from '@angular/core';
+import { Component, Input, ChangeDetectionStrategy } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { AgentLevel } from '../../models/types';
 
@@ -7,7 +7,8 @@ import { AgentLevel } from '../../models/types';
   standalone: true,
   imports: [CommonModule],
   templateUrl: './level-badge.component.html',
-  styleUrl: './level-badge.component.scss'
+  styleUrl: './level-badge.component.scss',
+  changeDetection: ChangeDetectionStrategy.OnPush
 })
 export class LevelBadgeComponent {
   @Input() level!: AgentLevel;

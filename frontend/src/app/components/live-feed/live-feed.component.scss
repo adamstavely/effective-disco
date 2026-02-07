@@ -1,22 +1,8 @@
 @import '../../../styles/tokens';
+@import '../../../styles/shared';
 
 .live-feed {
-  display: flex;
-  flex-direction: column;
-  height: 100%;
-}
-
-.panel-header {
-  padding-bottom: var(--spacing-4);
-  border-bottom: var(--border-width) var(--border-style) var(--border-color);
-  margin-bottom: var(--spacing-4);
-
-  h2 {
-    font-size: var(--font-size-lg);
-    font-weight: var(--font-weight-semibold);
-    letter-spacing: var(--letter-spacing-normal);
-    color: var(--color-neutral-600);
-  }
+  @extend .panel-container;
 }
 
 .feed-filters {
@@ -26,30 +12,9 @@
   margin-bottom: var(--spacing-4);
 }
 
-.filter-btn {
-  padding: var(--spacing-2) var(--spacing-3);
-  background: var(--color-neutral-100);
-  border: var(--border-width) var(--border-style) var(--border-color);
-  border-radius: var(--radius-md);
-  cursor: pointer;
-  font-size: var(--font-size-base);
-  transition: all var(--transition-fast);
-
-  &:hover {
-    background: var(--color-neutral-300);
-  }
-
-  &.active {
-    background: var(--color-primary-500);
-    color: var(--color-neutral-0);
-    border-color: var(--color-primary-500);
-  }
-}
-
 .activities-list {
+  @extend .panel-content;
   display: flex;
   flex-direction: column;
   gap: var(--spacing-3);
-  overflow-y: auto;
-  flex: 1;
 }

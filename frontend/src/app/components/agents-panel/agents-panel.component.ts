@@ -1,33 +1,25 @@
-import { Component, OnInit, OnDestroy, Output, EventEmitter } from '@angular/core';
+import { Component, ChangeDetectionStrategy, Output, EventEmitter } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { ConvexService } from '../../services/convex.service';
-import { Agent } from '../../models/types';
 import { AgentCardComponent } from '../agent-card/agent-card.component';
-import { Subscription } from 'rxjs';
+import { PanelHeaderComponent } from '../../shared/components/panel-header/panel-header.component';
+import { Observable } from 'rxjs';
 
 @Component({
   selector: 'app-agents-panel',
   standalone: true,
-  imports: [CommonModule, AgentCardComponent],
+  imports: [CommonModule, AgentCardComponent, PanelHeaderComponent],
   templateUrl: './agents-panel.component.html',
-  styleUrl: './agents-panel.component.scss'
+  styleUrl: './agents-panel.component.scss',
+  changeDetection: ChangeDetectionStrategy.OnPush
 })
-export class AgentsPanelComponent implements OnInit, OnDestroy {
-  agents: Agent[] = [];
+export class AgentsPanelComponent {
+  agents$: Observable<any[]>;
   selectedAgentId: string | null = null;
   @Output() agentSelected = new EventEmitter<string | null>();
-  private subscription?: Subscription;
 
-  constructor(private convexService: ConvexService) {}
-
-  ngOnInit(): void {
-    this.subscription = this.convexService.getAgents().subscribe(agents => {
-      this.agents = agents;
-    });
-  }
-
-  ngOnDestroy(): void {
-    this.subscription?.unsubscribe();
+  constructor(private convexService: ConvexService) {
+    this.agents$ = this.convexService.getAgents();
   }
 
   selectAgent(agentId: string | null): void {

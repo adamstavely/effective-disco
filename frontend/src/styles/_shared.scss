@@ -1,0 +1,13 @@
+@import './tokens';
+
+// Shared panel styles
+.panel-container {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+}
+
+.panel-content {
+  overflow-y: auto;
+  flex: 1;
+}

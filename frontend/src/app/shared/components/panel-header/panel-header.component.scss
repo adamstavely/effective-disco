@@ -1,0 +1,22 @@
+@import '../../../../styles/tokens';
+
+.panel-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding-bottom: var(--spacing-4);
+  border-bottom: var(--border-width) var(--border-style) var(--border-color);
+  margin-bottom: var(--spacing-4);
+
+  h2 {
+    font-size: var(--font-size-lg);
+    font-weight: var(--font-weight-semibold);
+    letter-spacing: var(--letter-spacing-normal);
+    color: var(--color-neutral-600);
+  }
+
+  .count {
+    font-size: var(--font-size-md);
+    color: var(--color-neutral-500);
+  }
+}
