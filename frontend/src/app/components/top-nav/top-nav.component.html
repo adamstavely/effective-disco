@@ -1,0 +1,26 @@
+<nav class="top-nav">
+  <div class="nav-left">
+    <div class="logo">MISSION CONTROL</div>
+  </div>
+  <div class="nav-center">
+    <div class="stat">
+      <span class="stat-value">{{ agentsActive }}</span>
+      <span class="stat-label">AGENTS ACTIVE</span>
+    </div>
+    <div class="stat">
+      <span class="stat-value">{{ tasksInQueue }}</span>
+      <span class="stat-label">TASKS IN QUEUE</span>
+    </div>
+  </div>
+  <div class="nav-right">
+    <button class="docs-btn">Docs</button>
+    <div class="timestamp">
+      <span class="time">{{ formatTime() }}</span>
+      <span class="date">{{ formatDate() }}</span>
+    </div>
+    <div class="status-indicator">
+      <span class="status-dot"></span>
+      <span>ONLINE</span>
+    </div>
+  </div>
+</nav>

@@ -1,0 +1,20 @@
+<div class="mission-queue">
+  <div class="panel-header">
+    <h2>MISSION QUEUE</h2>
+  </div>
+  <div class="kanban-board">
+    <div class="kanban-column" *ngFor="let status of statuses">
+      <div class="column-header">
+        <span class="status-dot" [class]="'dot-' + status"></span>
+        <span class="status-name">{{ getStatusLabel(status) }}</span>
+        <span class="task-count">{{ getTaskCount(status) }}</span>
+      </div>
+      <div class="tasks-list">
+        <app-task-card
+          *ngFor="let task of tasks[status]"
+          [task]="task"
+        ></app-task-card>
+      </div>
+    </div>
+  </div>
+</div>

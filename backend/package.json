@@ -1,0 +1,27 @@
+{
+  "name": "mission-control-backend",
+  "version": "1.0.0",
+  "type": "module",
+  "scripts": {
+    "dev": "convex dev",
+    "build": "tsc",
+    "start": "node dist/index.js",
+    "init-agents": "tsx scripts/init-agents.ts"
+  },
+  "dependencies": {
+    "convex": "^1.12.0",
+    "langchain": "^0.3.0",
+    "@langchain/core": "^0.3.0",
+    "@langchain/openai": "^0.3.0",
+    "@langchain/anthropic": "^0.3.0",
+    "zod": "^3.22.4",
+    "node-cron": "^3.0.3",
+    "dotenv": "^16.4.1"
+  },
+  "devDependencies": {
+    "@types/node": "^20.11.0",
+    "@types/node-cron": "^3.0.11",
+    "typescript": "^5.3.3",
+    "tsx": "^4.7.0"
+  }
+}

@@ -1,0 +1,13 @@
+<div class="task-card">
+  <div class="task-title">{{ task.title }}</div>
+  <div class="task-description">{{ getDescriptionSnippet() }}</div>
+  <div class="task-meta">
+    <span class="task-age">{{ getTimeAgo() }}</span>
+    <div class="task-tags">
+      <app-tag *ngFor="let tag of ['research', 'documentation']" [text]="tag"></app-tag>
+    </div>
+  </div>
+  <div class="task-footer">
+    <span class="expand-icon">▲</span>
+  </div>
+</div>
