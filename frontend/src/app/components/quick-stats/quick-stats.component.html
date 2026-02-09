@@ -1,0 +1,31 @@
+<div class="quick-stats">
+  <app-panel-header title="QUICK STATS"></app-panel-header>
+  <div class="stats-grid">
+    <ng-container *ngIf="stats$ | async as stats">
+      <div class="stat-card">
+        <div class="stat-label">PROPOSALS TODAY</div>
+        <div class="stat-value">{{ stats.proposalsToday }}</div>
+      </div>
+      
+      <div class="stat-card">
+        <div class="stat-label">MISSIONS COMPLETED</div>
+        <div class="stat-value">{{ stats.missionsCompleted }}</div>
+      </div>
+      
+      <div class="stat-card">
+        <div class="stat-label">SUCCESS RATE</div>
+        <div class="stat-value">{{ stats.successRate }}%</div>
+      </div>
+      
+      <div class="stat-card">
+        <div class="stat-label">COST TODAY</div>
+        <div class="stat-value">{{ formatCurrency(stats.costToday) }}</div>
+      </div>
+      
+      <div class="stat-card">
+        <div class="stat-label">BUDGET REMAINING</div>
+        <div class="stat-value">{{ formatCurrency(stats.budgetRemaining) }}</div>
+      </div>
+    </ng-container>
+  </div>
+</div>

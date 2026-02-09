@@ -6,8 +6,12 @@ import { DynamicStructuredTool } from "@langchain/core/tools";
 import { z } from "zod";
 import * as fs from "fs/promises";
 import * as path from "path";
-import { ConvexHttpClient } from "convex/node";
-import { api } from "../../convex/_generated/api";
+import { getSupabaseClient } from "../../supabase/client";
+import * as agentsFunctions from "../../supabase/functions/agents";
+import * as tasksFunctions from "../../supabase/functions/tasks";
+import * as messagesFunctions from "../../supabase/functions/messages";
+import * as documentsFunctions from "../../supabase/functions/documents";
+import * as notificationsFunctions from "../../supabase/functions/notifications";
 
 export interface AgentConfig {
   name: string;
@@ -23,12 +27,9 @@ export class Agent {
   private config: AgentConfig;
   private executor?: AgentExecutor;
   private sessionHistory: Array<{ role: string; content: string }> = [];
-  private convexClient: ConvexHttpClient;
 
   constructor(config: AgentConfig) {
     this.config = config;
-    const convexUrl = process.env.CONVEX_URL || "";
-    this.convexClient = new ConvexHttpClient(convexUrl);
   }
 
   async initialize(): Promise<void> {
@@ -133,20 +134,16 @@ export class Agent {
         },
       }),
 
-      // Convex tools
+      // Supabase tools
       new DynamicStructuredTool({
         name: "get_assigned_tasks",
         description: "Get all tasks assigned to this agent",
         schema: z.object({}),
         func: async () => {
-          const agent = await this.convexClient.query(api.agents.getBySessionKey, {
-            sessionKey: this.config.sessionKey,
-          });
+          const agent = await agentsFunctions.getAgentBySessionKey(this.config.sessionKey);
           if (!agent) return "Agent not found in Mission Control";
           
-          const tasks = await this.convexClient.query(api.tasks.getByAssignee, {
-            agentId: agent._id,
-          });
+          const tasks = await tasksFunctions.getTasksByAssignee(agent.id);
           return JSON.stringify(tasks, null, 2);
         },
       }),
@@ -158,7 +155,7 @@ export class Agent {
           taskId: z.string().describe("The task ID"),
         }),
         func: async ({ taskId }) => {
-          const task = await this.convexClient.query(api.tasks.getById, { id: taskId as any });
+          const task = await tasksFunctions.getTaskById(taskId);
           if (!task) return "Task not found";
           return JSON.stringify(task, null, 2);
         },
@@ -173,25 +170,23 @@ export class Agent {
           mentions: z.array(z.string()).optional().describe("Agent names to mention (@AgentName)"),
         }),
         func: async ({ taskId, content, mentions }) => {
-          const agent = await this.convexClient.query(api.agents.getBySessionKey, {
-            sessionKey: this.config.sessionKey,
-          });
+          const agent = await agentsFunctions.getAgentBySessionKey(this.config.sessionKey);
           if (!agent) return "Agent not found in Mission Control";
 
           // Extract mentions from content if not provided
           let mentionIds: string[] = [];
           if (mentions && mentions.length > 0) {
-            const allAgents = await this.convexClient.query(api.agents.getAll, {});
+            const allAgents = await agentsFunctions.getAllAgents();
             mentionIds = allAgents
               .filter((a) => mentions.includes(a.name))
-              .map((a) => a._id);
+              .map((a) => a.id);
           }
 
-          await this.convexClient.mutation(api.messages.create, {
-            taskId: taskId as any,
-            fromAgentId: agent._id,
+          await messagesFunctions.createMessage({
+            taskId,
+            fromAgentId: agent.id,
             content,
-            mentions: mentionIds as any[],
+            mentions: mentionIds,
           });
 
           return "Message posted";
@@ -206,10 +201,7 @@ export class Agent {
           status: z.enum(["inbox", "assigned", "in_progress", "review", "done", "blocked"]),
         }),
         func: async ({ taskId, status }) => {
-          await this.convexClient.mutation(api.tasks.update, {
-            id: taskId as any,
-            status,
-          });
+          await tasksFunctions.updateTask(taskId, { status });
           return `Task status updated to ${status}`;
         },
       }),
@@ -224,17 +216,15 @@ export class Agent {
           taskId: z.string().optional().describe("Optional task ID to attach to"),
         }),
         func: async ({ title, content, type, taskId }) => {
-          const agent = await this.convexClient.query(api.agents.getBySessionKey, {
-            sessionKey: this.config.sessionKey,
-          });
+          const agent = await agentsFunctions.getAgentBySessionKey(this.config.sessionKey);
           if (!agent) return "Agent not found in Mission Control";
 
-          await this.convexClient.mutation(api.documents.create, {
+          await documentsFunctions.createDocument({
             title,
             content,
             type,
-            createdBy: agent._id,
-            taskId: taskId ? (taskId as any) : null,
+            createdBy: agent.id,
+            taskId: taskId || null,
           });
 
           return "Document created";
@@ -246,14 +236,10 @@ export class Agent {
         description: "Check for undelivered notifications",
         schema: z.object({}),
         func: async () => {
-          const agent = await this.convexClient.query(api.agents.getBySessionKey, {
-            sessionKey: this.config.sessionKey,
-          });
+          const agent = await agentsFunctions.getAgentBySessionKey(this.config.sessionKey);
           if (!agent) return "Agent not found in Mission Control";
 
-          const notifications = await this.convexClient.query(api.notifications.getUndelivered, {
-            agentId: agent._id,
-          });
+          const notifications = await notificationsFunctions.getUndeliveredNotifications(agent.id);
 
           if (notifications.length === 0) return "No new notifications";
           return JSON.stringify(notifications, null, 2);

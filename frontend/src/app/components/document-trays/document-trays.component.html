@@ -1,0 +1,17 @@
+<div class="document-trays" *ngIf="selectedDocument">
+  <div class="trays-container">
+    <!-- Preview Tray -->
+    <app-document-preview-tray
+      *ngIf="showPreview"
+      [document]="selectedDocument"
+      (close)="onClosePreview()"
+    ></app-document-preview-tray>
+
+    <!-- Conversation Tray -->
+    <app-document-conversation-tray
+      *ngIf="showConversation"
+      [document]="selectedDocument"
+      (close)="onCloseConversation()"
+    ></app-document-conversation-tray>
+  </div>
+</div>

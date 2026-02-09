@@ -1,0 +1,304 @@
+@import '../../../styles/tokens';
+
+.agent-detail-tray {
+  position: fixed;
+  right: 0;
+  top: 0;
+  bottom: 0;
+  width: 400px;
+  background: var(--color-neutral-0);
+  border-left: var(--border-width) var(--border-style) var(--border-color);
+  box-shadow: var(--shadow-md);
+  display: flex;
+  flex-direction: column;
+  z-index: var(--z-index-modal);
+  overflow: hidden;
+}
+
+.tray-header {
+  padding: var(--spacing-4);
+  border-bottom: var(--border-width) var(--border-style) var(--border-color);
+  background: var(--color-neutral-50);
+}
+
+.header-content {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.tray-title {
+  font-size: var(--font-size-xl);
+  font-weight: var(--font-weight-semibold);
+  color: var(--color-neutral-700);
+  margin: 0;
+}
+
+.close-btn {
+  background: none;
+  border: none;
+  font-size: var(--font-size-3xl);
+  line-height: 1;
+  color: var(--color-neutral-600);
+  cursor: pointer;
+  padding: 0;
+  width: 32px;
+  height: 32px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: var(--radius-md);
+  transition: all var(--transition-fast);
+
+  &:hover {
+    background: var(--color-neutral-200);
+    color: var(--color-neutral-700);
+  }
+}
+
+.tray-content {
+  flex: 1;
+  overflow-y: auto;
+  padding: var(--spacing-4);
+  display: flex;
+  flex-direction: column;
+  gap: var(--spacing-6);
+}
+
+section {
+  display: flex;
+  flex-direction: column;
+  gap: var(--spacing-3);
+}
+
+.section-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: var(--spacing-2);
+}
+
+h3 {
+  font-size: var(--font-size-lg);
+  font-weight: var(--font-weight-semibold);
+  color: var(--color-neutral-700);
+  margin: 0;
+}
+
+.edit-btn,
+.save-btn {
+  padding: var(--spacing-2) var(--spacing-3);
+  background: var(--color-primary-500);
+  color: var(--color-neutral-0);
+  border: none;
+  border-radius: var(--radius-md);
+  font-size: var(--font-size-sm);
+  font-weight: var(--font-weight-medium);
+  cursor: pointer;
+  transition: all var(--transition-fast);
+
+  &:hover {
+    background: var(--color-primary-600);
+  }
+}
+
+.edit-btn {
+  background: transparent;
+  color: var(--color-primary-500);
+  border: var(--border-width) var(--border-style) var(--color-primary-500);
+
+  &:hover {
+    background: var(--color-primary-50);
+  }
+}
+
+.profile-content {
+  display: flex;
+  flex-direction: column;
+  gap: var(--spacing-4);
+}
+
+.field {
+  display: flex;
+  flex-direction: column;
+  gap: var(--spacing-1);
+}
+
+label {
+  font-size: var(--font-size-sm);
+  font-weight: var(--font-weight-medium);
+  color: var(--color-neutral-600);
+  text-transform: uppercase;
+  letter-spacing: var(--letter-spacing-tight);
+}
+
+.value {
+  font-size: var(--font-size-base);
+  color: var(--color-neutral-700);
+  padding: var(--spacing-2) 0;
+}
+
+.text-area-value {
+  white-space: pre-wrap;
+  word-break: break-word;
+  max-height: 200px;
+  overflow-y: auto;
+}
+
+.input,
+.select,
+.textarea {
+  padding: var(--spacing-2) var(--spacing-3);
+  border: var(--border-width) var(--border-style) var(--border-color);
+  border-radius: var(--radius-md);
+  font-size: var(--font-size-base);
+  font-family: var(--font-family-base);
+  color: var(--color-neutral-700);
+  background: var(--color-neutral-0);
+  transition: all var(--transition-fast);
+
+  &:focus {
+    outline: none;
+    border-color: var(--color-primary-500);
+    box-shadow: 0 0 0 2px var(--color-primary-50);
+  }
+}
+
+.textarea {
+  resize: vertical;
+  min-height: 80px;
+}
+
+.avatar-display {
+  display: flex;
+  align-items: center;
+  gap: var(--spacing-2);
+}
+
+.avatar-icon {
+  width: 48px;
+  height: 48px;
+  border-radius: var(--radius-full);
+  background: var(--color-neutral-200);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: var(--font-size-2xl);
+}
+
+.metrics-grid {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: var(--spacing-3);
+}
+
+.metric-card {
+  padding: var(--spacing-4);
+  background: var(--color-neutral-50);
+  border: var(--border-width) var(--border-style) var(--border-color);
+  border-radius: var(--radius-lg);
+  text-align: center;
+}
+
+.metric-value {
+  font-size: var(--font-size-3xl);
+  font-weight: var(--font-weight-bold);
+  color: var(--color-neutral-700);
+  margin-bottom: var(--spacing-1);
+}
+
+.metric-label {
+  font-size: var(--font-size-xs);
+  color: var(--color-neutral-600);
+  text-transform: uppercase;
+  letter-spacing: var(--letter-spacing-tight);
+}
+
+.missions-list,
+.activities-list {
+  display: flex;
+  flex-direction: column;
+  gap: var(--spacing-2);
+}
+
+.mission-item {
+  padding: var(--spacing-3);
+  background: var(--color-neutral-50);
+  border: var(--border-width) var(--border-style) var(--border-color);
+  border-radius: var(--radius-md);
+}
+
+.mission-title {
+  font-size: var(--font-size-base);
+  font-weight: var(--font-weight-semibold);
+  color: var(--color-neutral-700);
+  margin-bottom: var(--spacing-1);
+}
+
+.mission-meta {
+  display: flex;
+  gap: var(--spacing-3);
+  font-size: var(--font-size-sm);
+  color: var(--color-neutral-600);
+}
+
+.mission-status {
+  text-transform: uppercase;
+  letter-spacing: var(--letter-spacing-tight);
+}
+
+.activity-item {
+  padding: var(--spacing-3);
+  background: var(--color-neutral-50);
+  border: var(--border-width) var(--border-style) var(--border-color);
+  border-radius: var(--radius-md);
+  border-left: 3px solid var(--color-neutral-400);
+}
+
+.activity-header {
+  display: flex;
+  align-items: center;
+  gap: var(--spacing-2);
+  margin-bottom: var(--spacing-2);
+}
+
+.activity-status-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: var(--radius-full);
+  flex-shrink: 0;
+}
+
+.activity-type {
+  font-size: var(--font-size-sm);
+  font-weight: var(--font-weight-semibold);
+  color: var(--color-neutral-700);
+  text-transform: uppercase;
+  letter-spacing: var(--letter-spacing-tight);
+  flex: 1;
+}
+
+.activity-time {
+  font-size: var(--font-size-xs);
+  color: var(--color-neutral-600);
+}
+
+.activity-message {
+  font-size: var(--font-size-sm);
+  color: var(--color-neutral-600);
+  margin-bottom: var(--spacing-1);
+}
+
+.activity-task {
+  font-size: var(--font-size-xs);
+  color: var(--color-neutral-500);
+  font-family: monospace;
+}
+
+.empty-state {
+  padding: var(--spacing-4);
+  text-align: center;
+  color: var(--color-neutral-500);
+  font-size: var(--font-size-sm);
+  font-style: italic;
+}

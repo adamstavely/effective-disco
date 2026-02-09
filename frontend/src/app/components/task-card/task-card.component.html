@@ -1,13 +1,47 @@
-<div class="task-card">
-  <div class="task-title">{{ task.title }}</div>
-  <div class="task-description">{{ getDescriptionSnippet() }}</div>
-  <div class="task-meta">
-    <span class="task-age">{{ task.createdAt | timeAgo }}</span>
-    <div class="task-tags">
-      <app-tag *ngFor="let tag of ['research', 'documentation']" [text]="tag"></app-tag>
-    </div>
+<div class="task-card" 
+     [class.has-border-color]="task.borderColor" 
+     [class.selected]="selected"
+     [style.border-color]="task.borderColor || ''" 
+     cdkDrag>
+  <div class="drag-handle" cdkDragHandle>
+    <span class="drag-icon">⋮</span>
   </div>
-  <div class="task-footer">
-    <span class="expand-icon">▲</span>
+  <div class="task-content">
+    <div class="task-title">{{ task.title }}</div>
+    <div class="task-description">{{ getDescriptionSnippet() }}</div>
+    <div class="task-meta">
+      <div class="task-time-info">
+        <span class="task-age">{{ task.createdAt | timeAgo }}</span>
+        <span class="last-message" *ngIf="hasLastMessage()">
+          Last message: {{ task.lastMessageAt! | timeAgo }}
+        </span>
+      </div>
+      <div class="task-tags" *ngIf="hasTags()">
+        <app-tag *ngFor="let tag of getVisibleTags()" [text]="tag"></app-tag>
+        <span class="tags-more" *ngIf="getRemainingTagsCount() > 0">
+          +{{ getRemainingTagsCount() }} more
+        </span>
+      </div>
+    </div>
+    <div class="task-footer">
+      <div class="task-actions">
+        <button 
+          class="action-button play-button" 
+          *ngIf="canResumeTask()"
+          (click)="onPlayClick($event)"
+          title="Resume task"
+          type="button">
+          ▶
+        </button>
+        <button 
+          class="action-button archive-button" 
+          (click)="onArchiveClick($event)"
+          title="Archive task"
+          type="button">
+          📦
+        </button>
+      </div>
+      <span class="expand-icon">▲</span>
+    </div>
   </div>
 </div>

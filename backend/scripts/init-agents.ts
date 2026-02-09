@@ -1,13 +1,10 @@
-import { ConvexHttpClient } from "convex/node";
-import { api } from "../convex/_generated/api";
 import * as dotenv from "dotenv";
+import * as agentsFunctions from "../supabase/functions/agents";
 
 dotenv.config();
 
-const convexClient = new ConvexHttpClient(process.env.CONVEX_URL || "");
-
 async function initializeAgents() {
-  console.log("Initializing agents in Convex database...");
+  console.log("Initializing agents in Supabase database...");
 
   const agents = [
     {
@@ -33,9 +30,7 @@ async function initializeAgents() {
   for (const agentData of agents) {
     try {
       // Check if agent already exists
-      const existing = await convexClient.query(api.agents.getBySessionKey, {
-        sessionKey: agentData.sessionKey,
-      });
+      const existing = await agentsFunctions.getAgentBySessionKey(agentData.sessionKey);
 
       if (existing) {
         console.log(`Agent ${agentData.name} already exists`);
@@ -43,8 +38,8 @@ async function initializeAgents() {
       }
 
       // Create agent
-      const agentId = await convexClient.mutation(api.agents.create, agentData);
-      console.log(`Created agent ${agentData.name} with ID: ${agentId}`);
+      const agent = await agentsFunctions.createAgent(agentData);
+      console.log(`Created agent ${agentData.name} with ID: ${agent.id}`);
     } catch (error) {
       console.error(`Error creating agent ${agentData.name}:`, error);
     }

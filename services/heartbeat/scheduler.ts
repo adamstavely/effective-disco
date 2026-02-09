@@ -2,12 +2,14 @@ import * as cron from "node-cron";
 import { createJarvis } from "../../backend/agents/jarvis";
 import { createShuri } from "../../backend/agents/shuri";
 import { createFriday } from "../../backend/agents/friday";
-import { ConvexHttpClient } from "convex/node";
-import { api } from "../../backend/convex/_generated/api";
+import { getSupabaseClient } from "../../backend/supabase/client";
+import * as agentsFunctions from "../../backend/supabase/functions/agents";
+import * as tasksFunctions from "../../backend/supabase/functions/tasks";
+import * as notificationsFunctions from "../../backend/supabase/functions/notifications";
 import * as fs from "fs/promises";
 import * as path from "path";
 
-const convexClient = new ConvexHttpClient(process.env.CONVEX_URL || "");
+const supabase = getSupabaseClient();
 
 interface AgentSchedule {
   name: string;
@@ -50,23 +52,17 @@ async function executeHeartbeat(agentSchedule: AgentSchedule): Promise<void> {
     const workingContent = await fs.readFile(workingPath, "utf-8").catch(() => "");
 
     // Check for notifications
-    const dbAgent = await convexClient.query(api.agents.getBySessionKey, {
-      sessionKey: agentSchedule.sessionKey,
-    });
+    const dbAgent = await agentsFunctions.getAgentBySessionKey(agentSchedule.sessionKey);
 
     if (!dbAgent) {
       console.log(`Agent ${agentSchedule.name} not found in database`);
       return;
     }
 
-    const notifications = await convexClient.query(api.notifications.getUndelivered, {
-      agentId: dbAgent._id,
-    });
+    const notifications = await notificationsFunctions.getUndeliveredNotifications(dbAgent.id);
 
     // Check for assigned tasks
-    const assignedTasks = await convexClient.query(api.tasks.getByAssignee, {
-      agentId: dbAgent._id,
-    });
+    const assignedTasks = await tasksFunctions.getTasksByAssignee(dbAgent.id);
 
     // Build heartbeat message
     let heartbeatMessage = `You are ${agentSchedule.name}, the ${dbAgent.role}. `;
@@ -98,16 +94,14 @@ async function executeHeartbeat(agentSchedule: AgentSchedule): Promise<void> {
 
     // Update agent status
     const isActive = !response.includes("HEARTBEAT_OK");
-    await convexClient.mutation(api.agents.updateStatus, {
-      id: dbAgent._id,
-      status: isActive ? "active" : "idle",
-    });
+    await agentsFunctions.updateAgentStatus(
+      dbAgent.id,
+      isActive ? "active" : "idle"
+    );
 
     // Mark notifications as delivered
     if (notifications.length > 0) {
-      await convexClient.mutation(api.notifications.markAllDelivered, {
-        agentId: dbAgent._id,
-      });
+      await notificationsFunctions.markAllNotificationsDelivered(dbAgent.id);
     }
 
     console.log(`[${new Date().toISOString()}] Heartbeat complete: ${agentSchedule.name} - ${response.substring(0, 100)}`);

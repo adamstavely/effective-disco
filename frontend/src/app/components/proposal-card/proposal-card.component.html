@@ -1,0 +1,53 @@
+<div class="proposal-card" [class]="getStatusClass()">
+  <div class="proposal-header">
+    <div class="proposal-title">{{ proposal.title }}</div>
+    <div class="proposal-badges">
+      <span class="status-badge" [class]="getStatusClass()">
+        {{ getStatusLabel(proposal.status) }}
+      </span>
+      <span class="priority-badge" [class]="getPriorityClass()">
+        {{ getPriorityLabel(proposal.priority) }}
+      </span>
+    </div>
+  </div>
+  
+  <div class="proposal-description">{{ getDescriptionSnippet() }}</div>
+  
+  <div class="proposal-meta">
+    <div class="proposal-source">
+      <span class="meta-label">Source:</span>
+      <span class="meta-value">{{ proposal.source }}</span>
+    </div>
+    <div class="proposal-date">
+      <span class="meta-label">Created:</span>
+      <span class="meta-value">{{ proposal.createdAt | timeAgo }}</span>
+    </div>
+  </div>
+
+  <div class="proposed-steps" *ngIf="proposal.proposedSteps && proposal.proposedSteps.length > 0">
+    <div class="steps-header">Proposed Steps ({{ proposal.proposedSteps.length }})</div>
+    <ul class="steps-list">
+      <li *ngFor="let step of proposal.proposedSteps.slice(0, 3)">
+        {{ step.title }}
+      </li>
+      <li *ngIf="proposal.proposedSteps.length > 3" class="steps-more">
+        +{{ proposal.proposedSteps.length - 3 }} more steps
+      </li>
+    </ul>
+  </div>
+
+  <div class="proposal-actions" *ngIf="proposal.status === 'pending'">
+    <button class="action-btn approve-btn" (click)="onApprove()">
+      Approve
+    </button>
+    <button class="action-btn reject-btn" (click)="onReject()">
+      Reject
+    </button>
+  </div>
+
+  <div class="proposal-actions" *ngIf="proposal.status === 'approved'">
+    <button class="action-btn convert-btn" (click)="onConvertToTask()">
+      Convert to Mission
+    </button>
+  </div>
+</div>

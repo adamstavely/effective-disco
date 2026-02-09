@@ -1,10 +1,9 @@
-import { ConvexHttpClient } from "convex/node";
-import { api } from "../../backend/convex/_generated/api";
+import * as agentsFunctions from "../../backend/supabase/functions/agents";
+import * as notificationsFunctions from "../../backend/supabase/functions/notifications";
 import { createJarvis } from "../../backend/agents/jarvis";
 import { createShuri } from "../../backend/agents/shuri";
 import { createFriday } from "../../backend/agents/friday";
 
-const convexClient = new ConvexHttpClient(process.env.CONVEX_URL || "");
 
 const agentCreators: Record<string, () => any> = {
   "agent:main:main": createJarvis,
@@ -15,20 +14,18 @@ const agentCreators: Record<string, () => any> = {
 async function deliverNotifications(): Promise<void> {
   try {
     // Get all agents
-    const agents = await convexClient.query(api.agents.getAll, {});
+    const agents = await agentsFunctions.getAllAgents();
 
     for (const agent of agents) {
       // Get undelivered notifications
-      const notifications = await convexClient.query(api.notifications.getUndelivered, {
-        agentId: agent._id,
-      });
+      const notifications = await notificationsFunctions.getUndeliveredNotifications(agent.id);
 
       if (notifications.length === 0) continue;
 
       // Get agent creator
-      const createAgent = agentCreators[agent.sessionKey];
+      const createAgent = agentCreators[agent.session_key];
       if (!createAgent) {
-        console.log(`No agent creator found for ${agent.sessionKey}`);
+        console.log(`No agent creator found for ${agent.session_key}`);
         continue;
       }
 
@@ -42,9 +39,7 @@ async function deliverNotifications(): Promise<void> {
           await agentInstance.execute(message);
 
           // Mark as delivered
-          await convexClient.mutation(api.notifications.markDelivered, {
-            id: notification._id,
-          });
+          await notificationsFunctions.markNotificationDelivered(notification.id);
 
           console.log(`Delivered notification to ${agent.name}`);
         }

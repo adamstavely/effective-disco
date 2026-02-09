@@ -1,18 +1,64 @@
 <div class="mission-queue">
-  <app-panel-header title="MISSION QUEUE"></app-panel-header>
-  <div class="kanban-board" *ngIf="tasks$ | async as tasks">
-    <div class="kanban-column" *ngFor="let status of statuses">
-      <div class="column-header">
-        <span class="status-dot" [class]="'dot-' + status"></span>
-        <span class="status-name">{{ getStatusLabel(status) }}</span>
-        <span class="task-count">{{ getTaskCount(tasks, status) }}</span>
-      </div>
-      <div class="tasks-list">
-        <app-task-card
-          *ngFor="let task of tasks[status]"
-          [task]="task"
-        ></app-task-card>
-      </div>
+  <div class="header-section">
+    <app-panel-header title="MISSION QUEUE"></app-panel-header>
+    <div class="archive-toggle">
+      <label class="toggle-label">
+        <input 
+          type="checkbox" 
+          [checked]="showArchived" 
+          (change)="toggleArchived()"
+          class="toggle-input"
+        />
+        <span class="toggle-text">Show Archived</span>
+      </label>
     </div>
   </div>
+  <div class="kanban-board" [class.with-panel]="selectedTask">
+    <ng-container *ngIf="tasks$ | async as tasks; else loading">
+      <div 
+        class="kanban-column" 
+        *ngFor="let status of statuses"
+        cdkDropList
+        [id]="'kanban-column-' + status"
+        [cdkDropListData]="tasks[status]"
+        [cdkDropListConnectedTo]="getConnectedDropLists()"
+        (cdkDropListDropped)="onTaskDropped($event, status)"
+      >
+        <div class="column-header">
+          <span class="status-dot" [class]="'dot-' + status"></span>
+          <span class="status-name">{{ getStatusLabel(status) }}</span>
+          <span class="task-count">{{ getTaskCount(tasks, status) }}</span>
+        </div>
+        <div class="tasks-list">
+          <app-task-card
+            *ngFor="let task of tasks[status]"
+            [task]="task"
+            [selected]="selectedTask?._id === task._id"
+            (click)="selectTask(task)"
+            cdkDrag
+          ></app-task-card>
+          <div *ngIf="tasks[status]?.length === 0" class="empty-column">
+            No tasks
+          </div>
+        </div>
+      </div>
+    </ng-container>
+    <ng-template #loading>
+      <div class="kanban-column" *ngFor="let status of statuses">
+        <div class="column-header">
+          <span class="status-dot" [class]="'dot-' + status"></span>
+          <span class="status-name">{{ getStatusLabel(status) }}</span>
+          <span class="task-count">0</span>
+        </div>
+        <div class="tasks-list">
+          <div class="empty-column">Loading...</div>
+        </div>
+      </div>
+    </ng-template>
+  </div>
+  <app-task-detail-panel
+    *ngIf="selectedTask"
+    [task]="selectedTask"
+    (close)="closePanel()"
+  ></app-task-detail-panel>
 </div>

@@ -1,0 +1,26 @@
+@import '../../../styles/tokens';
+@import '../../../styles/shared';
+
+.proposals {
+  @extend .panel-container;
+}
+
+.proposals-tabs {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--spacing-2);
+  margin-bottom: var(--spacing-4);
+}
+
+.proposals-list {
+  @extend .panel-content;
+  display: flex;
+  flex-direction: column;
+}
+
+.empty-state {
+  padding: var(--spacing-8);
+  text-align: center;
+  color: var(--color-neutral-500);
+  font-size: var(--font-size-base);
+}

@@ -1,9 +1,17 @@
 export type AgentStatus = "idle" | "active" | "blocked";
 export type AgentLevel = "intern" | "specialist" | "lead";
-export type TaskStatus = "inbox" | "assigned" | "in_progress" | "review" | "done" | "blocked";
+export type TaskStatus = "inbox" | "assigned" | "in_progress" | "review" | "done" | "blocked" | "archived";
 export type TaskPriority = "low" | "medium" | "high";
 export type DocumentType = "deliverable" | "research" | "protocol" | "other";
-export type ActivityType = "task_created" | "message_sent" | "document_created" | "task_assigned" | "status_changed";
+export type ActivityType = "task_created" | "message_sent" | "document_created" | "task_assigned" | "status_changed" | "proposal_created" | "proposal_approved" | "proposal_rejected" | "proposal_converted";
+export type ProposalStatus = "pending" | "approved" | "rejected";
+export type ProposalPriority = "low" | "medium" | "high";
+
+export interface ProposedStep {
+  title: string;
+  description: string;
+  order: number;
+}
 
 export interface Agent {
   _id: string;
@@ -15,6 +23,11 @@ export interface Agent {
   sessionKey: string;
   level: AgentLevel;
   lastHeartbeat: number;
+  avatar?: string | null;
+  roleTag?: string | null;
+  systemPrompt?: string | null;
+  character?: string | null;
+  lore?: string | null;
 }
 
 export interface Task {
@@ -27,6 +40,10 @@ export interface Task {
   createdAt: number;
   updatedAt: number;
   priority: TaskPriority;
+  tags?: string[];
+  borderColor?: string;
+  startedAt?: number;
+  lastMessageAt?: number;
 }
 
 export interface Message {
@@ -59,6 +76,8 @@ export interface Document {
   taskId: string | null;
   createdBy: string;
   createdAt: number;
+  path?: string | null;
+  messageId?: string | null;
 }
 
 export interface Notification {
@@ -69,4 +88,19 @@ export interface Notification {
   taskId: string | null;
   delivered: boolean;
   createdAt: number;
+}
+
+export interface Proposal {
+  _id: string;
+  _creationTime: number;
+  title: string;
+  description: string;
+  source: string;
+  priority: ProposalPriority;
+  status: ProposalStatus;
+  proposedSteps: ProposedStep[];
+  createdAt: number;
+  updatedAt: number;
+  approvedAt?: number;
+  rejectedAt?: number;
 }

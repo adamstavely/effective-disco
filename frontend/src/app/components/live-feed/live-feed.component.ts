@@ -1,6 +1,6 @@
 import { Component, ChangeDetectionStrategy, ChangeDetectorRef } from '@angular/core';
 import { CommonModule } from '@angular/common';
-import { ConvexService } from '../../services/convex.service';
+import { SupabaseService } from '../../services/supabase.service';
 import { ActivityType } from '../../models/types';
 import { ActivityItemComponent } from '../activity-item/activity-item.component';
 import { PanelHeaderComponent } from '../../shared/components/panel-header/panel-header.component';
@@ -37,10 +37,10 @@ export class LiveFeedComponent {
   filteredActivities$: Observable<any[]>;
 
   constructor(
-    private convexService: ConvexService,
+    private supabaseService: SupabaseService,
     private cdr: ChangeDetectorRef
   ) {
-    this.activities$ = this.convexService.getActivityFeed(50);
+    this.activities$ = this.supabaseService.getActivityFeed(50);
     
     this.filteredActivities$ = combineLatest([
       this.activities$,

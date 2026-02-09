@@ -3,8 +3,9 @@
 ## Prerequisites
 
 1. Node.js 18+ installed
-2. Convex account and project
-3. OpenAI or Anthropic API key
+2. Docker (for local PostgreSQL)
+3. Supabase CLI (for local API and real-time)
+4. OpenAI or Anthropic API key
 
 ## Initial Setup
 
@@ -33,12 +34,13 @@ npm install
 
 ### 2. Configure Environment
 
-Create `.env` file in root:
+Create `.env` file in root (optional for local development):
 
 ```bash
-# Convex
-CONVEX_URL=https://your-project.convex.cloud
-CONVEX_DEPLOYMENT=production
+# Supabase (optional - defaults are used for local development)
+# SUPABASE_URL=http://127.0.0.1:54321
+# SUPABASE_ANON_KEY=...
+# SUPABASE_SERVICE_ROLE_KEY=...
 
 # OpenAI (optional, if using OpenAI models)
 OPENAI_API_KEY=sk-...
@@ -51,54 +53,41 @@ AGENT_MODEL=claude-3-5-sonnet-20241022
 AGENT_TEMPERATURE=0.7
 ```
 
-### 3. Initialize Convex
+**Note**: For local development, you don't need to set Supabase environment variables - the code uses default local values automatically.
+
+### 3. Start Local Supabase
 
 ```bash
-cd backend
-npx convex dev
+# Install Supabase CLI (if not already installed)
+# macOS: brew install supabase/tap/supabase
+# Or: npm install -g supabase
+
+# Start local Supabase (includes PostgreSQL, API, real-time)
+supabase start
+
+# This will automatically apply the schema from backend/supabase/schema.sql
 ```
 
-This will:
-- Create Convex project (if needed)
-- Deploy schema and functions
-- Generate TypeScript types
+See [LOCAL_SETUP.md](./LOCAL_SETUP.md) for detailed local setup instructions.
 
 ### 4. Create Initial Agents in Database
 
-You'll need to create agent records in Convex. You can do this via the Convex dashboard or create a script:
+Run the initialization script:
 
-```typescript
-// Create agents
-await convex.mutation(api.agents.create, {
-  name: "Jarvis",
-  role: "Squad Lead",
-  sessionKey: "agent:main:main",
-  level: "lead"
-});
-
-await convex.mutation(api.agents.create, {
-  name: "Shuri",
-  role: "Product Analyst",
-  sessionKey: "agent:product-analyst:main",
-  level: "specialist"
-});
-
-await convex.mutation(api.agents.create, {
-  name: "Friday",
-  role: "Developer",
-  sessionKey: "agent:developer:main",
-  level: "specialist"
-});
+```bash
+cd backend
+npm run init-agents
 ```
+
+This will create Jarvis, Shuri, and Friday agents in the database.
 
 ## Running the System
 
 ### Development Mode
 
-**Terminal 1: Convex Backend**
+**Terminal 1: Local Supabase** (if not already running)
 ```bash
-cd backend
-npx convex dev
+supabase start
 ```
 
 **Terminal 2: Angular Frontend**
@@ -119,7 +108,7 @@ cd services/notifications
 npm run dev
 ```
 
-**Terminal 5: Standup Generator** (optional, runs on schedule)
+**Terminal 4: Standup Generator** (optional, runs on schedule)
 ```bash
 cd services/standup
 npm run dev
@@ -147,15 +136,17 @@ node dist/index.js jarvis "Check Mission Control for tasks"
 
 ## Architecture
 
-- **Backend**: Convex functions + LangChain agents
+- **Backend**: Local PostgreSQL (via Supabase CLI) + LangChain agents
 - **Frontend**: Angular dashboard (port 4200)
 - **Services**: Background processes for heartbeats, notifications, standups
 - **Workspace**: Per-agent directories with memory, SOUL files, configs
 
 ## Next Steps
 
-1. Set up Convex project and deploy schema
-2. Create agent records in database
-3. Configure API keys
-4. Start all services
-5. Access dashboard at http://localhost:4200
+1. Install Supabase CLI and start local instance
+2. Run schema migration (automatic with `supabase start`)
+3. Create agent records in database (run init-agents script)
+4. Configure API keys in .env (OpenAI/Anthropic)
+5. Start all services
+6. Access dashboard at http://localhost:4200
+7. Access Supabase Studio at http://127.0.0.1:54323

@@ -8,4 +8,6 @@ dist/
 .parcel-cache/
 workspace/agents/*/config/*.json
 workspace/agents/*/sessions/*.jsonl
-convex/_generated/
+supabase/.branches
+supabase/.temp
+supabase/.seed

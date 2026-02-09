@@ -1,0 +1,243 @@
+<div class="task-detail-panel" *ngIf="task">
+  <!-- Document Trays -->
+  <app-document-trays
+    [selectedDocument]="selectedDocument"
+    (close)="closeDocumentTrays()"
+  ></app-document-trays>
+  <!-- Header -->
+  <div class="panel-header">
+    <div class="header-content">
+      <div class="title-section">
+        <h2 *ngIf="!isEditingTitle" (click)="startEditingTitle()" class="editable-title">
+          {{ task.title }}
+        </h2>
+        <input
+          *ngIf="isEditingTitle"
+          [(ngModel)]="editedTitle"
+          (blur)="saveTitle()"
+          (keydown.enter)="saveTitle()"
+          (keydown.escape)="cancelEditingTitle()"
+          class="title-input"
+          autofocus
+        />
+        <select
+          [value]="task.status"
+          (change)="updateStatus($any($event.target).value)"
+          class="status-select"
+        >
+          <option *ngFor="let status of TASK_STATUSES" [value]="status">
+            {{ TASK_STATUS_LABELS[status] }}
+          </option>
+        </select>
+      </div>
+      <button class="close-button" (click)="onClose()" aria-label="Close panel">×</button>
+    </div>
+  </div>
+
+  <!-- Content -->
+  <div class="panel-content">
+    <!-- Description -->
+    <div class="section">
+      <div class="section-header">
+        <h3>Description</h3>
+      </div>
+      <div class="section-content">
+        <div *ngIf="!isEditingDescription" class="description-view" (click)="startEditingDescription()">
+          <p *ngIf="task.description; else noDescription">{{ task.description }}</p>
+          <ng-template #noDescription>
+            <p class="placeholder">Click to add description...</p>
+          </ng-template>
+        </div>
+        <textarea
+          *ngIf="isEditingDescription"
+          [(ngModel)]="editedDescription"
+          (blur)="saveDescription()"
+          (keydown.escape)="cancelEditingDescription()"
+          class="description-input"
+          rows="4"
+          autofocus
+        ></textarea>
+      </div>
+    </div>
+
+    <!-- Tags -->
+    <div class="section">
+      <div class="section-header">
+        <h3>Tags</h3>
+      </div>
+      <div class="section-content">
+        <div class="tags-list" *ngIf="task.tags && task.tags.length > 0">
+          <div *ngFor="let tag of task.tags" class="tag-item">
+            <app-tag [text]="tag"></app-tag>
+            <button class="tag-remove" (click)="removeTag(tag)" aria-label="Remove tag">×</button>
+          </div>
+        </div>
+        <div *ngIf="!isAddingTag" class="add-tag-button" (click)="isAddingTag = true">
+          + Add Tag
+        </div>
+        <div *ngIf="isAddingTag" class="tag-input-container">
+          <input
+            [(ngModel)]="newTag"
+            (keydown.enter)="addTag()"
+            (keydown.escape)="isAddingTag = false; newTag = ''"
+            (blur)="isAddingTag = false; newTag = ''"
+            class="tag-input"
+            placeholder="Enter tag name"
+            autofocus
+          />
+        </div>
+      </div>
+    </div>
+
+    <!-- Assignees -->
+    <div class="section">
+      <div class="section-header">
+        <h3>Assignees</h3>
+      </div>
+      <div class="section-content">
+        <div class="assignees-list" *ngIf="assignees$ | async as assignees">
+          <div *ngFor="let assignee of assignees" class="assignee-item">
+            <span>{{ assignee.name }}</span>
+            <button class="remove-button" (click)="removeAssignee(assignee._id)" aria-label="Remove assignee">×</button>
+          </div>
+        </div>
+        <select
+          *ngIf="agents$ | async as agents"
+          (change)="addAssignee($any($event.target).value); $any($event.target).value = ''"
+          class="assignee-select"
+        >
+          <option value="">Add assignee...</option>
+          <option *ngFor="let agent of getAvailableAgents(agents)" [value]="agent._id">
+            {{ agent.name }} ({{ agent.role }})
+          </option>
+        </select>
+      </div>
+    </div>
+
+    <!-- Resources/Deliverables -->
+    <div class="section">
+      <div class="section-header">
+        <h3>Resources & Deliverables</h3>
+      </div>
+      <div class="section-content">
+        <div *ngIf="documents$ | async as documents">
+          <div *ngIf="documents.length > 0; else noDocuments" class="documents-list">
+            <div *ngFor="let doc of documents" class="document-item" (click)="selectDocument(doc)">
+              <span class="document-title">{{ doc.title }}</span>
+              <span class="document-type">{{ doc.type }}</span>
+            </div>
+          </div>
+          <ng-template #noDocuments>
+            <p class="empty-state">No documents attached</p>
+          </ng-template>
+        </div>
+        <div *ngIf="!isAddingDocument" class="add-document-button" (click)="startAddingDocument()">
+          + Attach Document
+        </div>
+        <div *ngIf="isAddingDocument" class="document-form">
+          <input
+            [(ngModel)]="newDocumentTitle"
+            class="document-input"
+            placeholder="Document title"
+            (keydown.escape)="cancelAddingDocument()"
+            autofocus
+          />
+          <textarea
+            [(ngModel)]="newDocumentContent"
+            class="document-textarea"
+            placeholder="Document content (markdown supported)"
+            rows="4"
+            (keydown.escape)="cancelAddingDocument()"
+          ></textarea>
+          <select
+            [(ngModel)]="newDocumentType"
+            class="document-type-select"
+          >
+            <option value="deliverable">Deliverable</option>
+            <option value="research">Research</option>
+            <option value="protocol">Protocol</option>
+            <option value="other">Other</option>
+          </select>
+          <div class="document-form-actions">
+            <button class="document-form-button save" (click)="createDocument()" type="button">
+              Create
+            </button>
+            <button class="document-form-button cancel" (click)="cancelAddingDocument()" type="button">
+              Cancel
+            </button>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Comments -->
+    <div class="section">
+      <div class="section-header">
+        <h3>Comments</h3>
+      </div>
+      <div class="section-content">
+        <div *ngIf="messages$ | async as messages">
+          <div *ngIf="messages.length > 0; else noMessages" class="comments-list">
+            <div *ngFor="let message of messages" class="comment-item">
+              <div class="comment-header">
+                <span class="comment-agent">{{ message.fromAgentId }}</span>
+                <span class="comment-time">{{ message.createdAt | timeAgo }}</span>
+              </div>
+              <div class="comment-content" [innerHTML]="message.content | markdown"></div>
+            </div>
+          </div>
+          <ng-template #noMessages>
+            <p class="empty-state">No comments yet</p>
+          </ng-template>
+        </div>
+      </div>
+    </div>
+
+    <!-- Quick Actions -->
+    <div class="section">
+      <div class="section-header">
+        <h3>Quick Actions</h3>
+      </div>
+      <div class="section-content">
+        <div class="actions-list">
+          <button class="action-button resume-button" (click)="resumeTask()" *ngIf="canResumeTask()">
+            Resume Task
+          </button>
+          <button class="action-button" (click)="markAsDone()" *ngIf="task.status !== 'done'">
+            Mark as Done
+          </button>
+          <button class="action-button archive-button" (click)="archiveTask()">
+            Archive
+          </button>
+        </div>
+      </div>
+    </div>
+
+    <!-- Metadata -->
+    <div class="section">
+      <div class="section-header">
+        <h3>Metadata</h3>
+      </div>
+      <div class="section-content metadata">
+        <div class="metadata-item">
+          <span class="metadata-label">Created:</span>
+          <span class="metadata-value">{{ task.createdAt | timeAgo }}</span>
+        </div>
+        <div class="metadata-item" *ngIf="task.updatedAt">
+          <span class="metadata-label">Updated:</span>
+          <span class="metadata-value">{{ task.updatedAt | timeAgo }}</span>
+        </div>
+        <div class="metadata-item" *ngIf="task.lastMessageAt">
+          <span class="metadata-label">Last message:</span>
+          <span class="metadata-value">{{ task.lastMessageAt | timeAgo }}</span>
+        </div>
+        <div class="metadata-item">
+          <span class="metadata-label">Task ID:</span>
+          <span class="metadata-value task-id" (click)="copyTaskId()" title="Click to copy">
+            {{ task._id.substring(0, 8) }}...
+          </span>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>

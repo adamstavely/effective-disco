@@ -1,11 +1,24 @@
-<div class="agent-card" [class.selected]="selected">
+<div class="agent-card" 
+     [class.selected]="selected"
+     [class.status-active]="isActive()"
+     [class.status-idle]="isIdle()">
   <div class="agent-header">
-    <div class="agent-icon">👤</div>
+    <div class="agent-avatar" [class.avatar-image]="isAvatarUrl()">
+      <img *ngIf="isAvatarUrl()" [src]="getAvatar()" [alt]="agent.name" />
+      <span *ngIf="!isAvatarUrl()" class="avatar-content">{{ getAvatar() }}</span>
+    </div>
     <div class="agent-info">
-      <div class="agent-name">{{ agent.name }}</div>
-      <app-level-badge [level]="agent.level"></app-level-badge>
+      <div class="agent-name-row">
+        <div class="agent-name">{{ agent.name }}</div>
+        <app-level-badge [level]="agent.level"></app-level-badge>
+      </div>
+      <div class="agent-role-row">
+        <div class="agent-role">{{ agent.role }}</div>
+        <span class="role-tag" *ngIf="agent.roleTag">{{ agent.roleTag }}</span>
+      </div>
     </div>
   </div>
-  <div class="agent-role">{{ agent.role }}</div>
-  <app-status-badge [status]="agent.status"></app-status-badge>
+  <div class="agent-status-row">
+    <app-status-badge [status]="agent.status"></app-status-badge>
+  </div>
 </div>

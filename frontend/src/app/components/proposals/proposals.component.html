@@ -1,0 +1,50 @@
+<div class="proposals">
+  <app-panel-header title="PROPOSALS"></app-panel-header>
+  
+  <div class="proposals-tabs">
+    <app-filter-button
+      label="All"
+      [count]="((pendingCount$ | async) || 0) + ((approvedCount$ | async) || 0) + ((rejectedCount$ | async) || 0)"
+      [active]="selectedTab === 'all'"
+      (clicked)="setTab('all')"
+    ></app-filter-button>
+    <app-filter-button
+      label="Pending"
+      [count]="(pendingCount$ | async) ?? 0"
+      [active]="selectedTab === 'pending'"
+      (clicked)="setTab('pending')"
+    ></app-filter-button>
+    <app-filter-button
+      label="Approved"
+      [count]="(approvedCount$ | async) ?? 0"
+      [active]="selectedTab === 'approved'"
+      (clicked)="setTab('approved')"
+    ></app-filter-button>
+    <app-filter-button
+      label="Rejected"
+      [count]="(rejectedCount$ | async) ?? 0"
+      [active]="selectedTab === 'rejected'"
+      (clicked)="setTab('rejected')"
+    ></app-filter-button>
+  </div>
+
+  <div class="proposals-list">
+    <ng-container *ngIf="proposals$ | async as proposals; else loading">
+      <app-proposal-card
+        *ngFor="let proposal of proposals"
+        [proposal]="proposal"
+        (approve)="onApprove($event)"
+        (reject)="onReject($event)"
+        (convertToTask)="onConvertToTask($event)"
+      ></app-proposal-card>
+      <div *ngIf="proposals.length === 0" class="empty-state">
+        <p>No proposals found.</p>
+      </div>
+    </ng-container>
+    <ng-template #loading>
+      <div class="empty-state">
+        <p>Loading proposals...</p>
+      </div>
+    </ng-template>
+  </div>
+</div>

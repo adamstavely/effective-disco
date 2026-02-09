@@ -7,6 +7,9 @@
   cursor: pointer;
   transition: all var(--transition-fast);
   background: var(--color-neutral-0);
+  display: flex;
+  flex-direction: column;
+  gap: var(--spacing-2);
 
   &:hover {
     border-color: var(--color-neutral-500);
@@ -17,24 +20,53 @@
     border-color: var(--color-primary-500);
     background: var(--color-primary-50);
   }
+
+  // Enhanced status styling
+  &.status-active {
+    border-left: 3px solid var(--color-status-success);
+  }
+
+  &.status-idle {
+    opacity: 0.85;
+  }
 }
 
 .agent-header {
   display: flex;
-  align-items: center;
+  align-items: flex-start;
   gap: var(--spacing-3);
-  margin-bottom: var(--spacing-2);
 }
 
-.agent-icon {
-  width: 32px;
-  height: 32px;
+.agent-avatar {
+  width: 40px;
+  height: 40px;
+  min-width: 40px;
   border-radius: var(--radius-full);
   background: var(--color-neutral-200);
   display: flex;
   align-items: center;
   justify-content: center;
-  font-size: var(--font-size-2xl);
+  font-size: var(--font-size-lg);
+  flex-shrink: 0;
+  overflow: hidden;
+
+  &.avatar-image {
+    background: transparent;
+    padding: 0;
+  }
+
+  img {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+    border-radius: var(--radius-full);
+  }
+
+  .avatar-content {
+    font-weight: var(--font-weight-semibold);
+    color: var(--color-neutral-600);
+    line-height: 1;
+  }
 }
 
 .agent-info {
@@ -42,16 +74,50 @@
   display: flex;
   flex-direction: column;
   gap: var(--spacing-1);
+  min-width: 0; // Allow text truncation
+}
+
+.agent-name-row {
+  display: flex;
+  align-items: center;
+  gap: var(--spacing-2);
+  flex-wrap: wrap;
 }
 
 .agent-name {
   font-weight: var(--font-weight-semibold);
   font-size: var(--font-size-xl);
   color: var(--color-neutral-700);
+  line-height: var(--line-height-tight);
+}
+
+.agent-role-row {
+  display: flex;
+  align-items: center;
+  gap: var(--spacing-2);
+  flex-wrap: wrap;
 }
 
 .agent-role {
   font-size: var(--font-size-base);
   color: var(--color-neutral-600);
-  margin-bottom: var(--spacing-2);
+  line-height: var(--line-height-normal);
+}
+
+.role-tag {
+  display: inline-block;
+  font-size: var(--font-size-xs);
+  font-weight: var(--font-weight-semibold);
+  padding: var(--spacing-1) var(--spacing-2);
+  background: var(--color-neutral-200);
+  color: var(--color-neutral-600);
+  border-radius: var(--radius-sm);
+  letter-spacing: var(--letter-spacing-tight);
+  text-transform: uppercase;
+}
+
+.agent-status-row {
+  display: flex;
+  align-items: center;
+  margin-top: var(--spacing-1);
 }

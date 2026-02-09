@@ -11,4 +11,9 @@
       (click)="selectAgent(agent._id)"
     ></app-agent-card>
   </div>
+  <app-agent-detail-tray
+    *ngIf="selectedAgentId"
+    [agent]="selectedAgent$ | async"
+    (close)="closeTray()"
+  ></app-agent-detail-tray>
 </div>

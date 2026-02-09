@@ -1,0 +1,209 @@
+<div class="agent-detail-tray" *ngIf="agent">
+  <div class="tray-header">
+    <div class="header-content">
+      <h2 class="tray-title">Agent Details</h2>
+      <button class="close-btn" (click)="onClose()" aria-label="Close">×</button>
+    </div>
+  </div>
+
+  <div class="tray-content">
+    <!-- Agent Profile Section -->
+    <section class="profile-section">
+      <div class="section-header">
+        <h3>Profile</h3>
+        <button class="edit-btn" (click)="toggleEditMode()">
+          {{ isEditMode ? 'Cancel' : 'Edit' }}
+        </button>
+      </div>
+
+      <div class="profile-content">
+        <!-- Avatar -->
+        <div class="field">
+          <label>Avatar</label>
+          <div *ngIf="!isEditMode" class="avatar-display">
+            <div class="avatar-icon">{{ agent.avatar || '👤' }}</div>
+          </div>
+          <input 
+            *ngIf="isEditMode" 
+            type="text" 
+            [(ngModel)]="editedAgent.avatar" 
+            placeholder="Emoji or URL"
+            class="input"
+          />
+        </div>
+
+        <!-- Name -->
+        <div class="field">
+          <label>Name</label>
+          <div *ngIf="!isEditMode" class="value">{{ agent.name }}</div>
+          <input 
+            *ngIf="isEditMode" 
+            type="text" 
+            [(ngModel)]="editedAgent.name" 
+            class="input"
+          />
+        </div>
+
+        <!-- Role -->
+        <div class="field">
+          <label>Role</label>
+          <div *ngIf="!isEditMode" class="value">{{ agent.role }}</div>
+          <input 
+            *ngIf="isEditMode" 
+            type="text" 
+            [(ngModel)]="editedAgent.role" 
+            class="input"
+          />
+        </div>
+
+        <!-- Role Tag -->
+        <div class="field">
+          <label>Role Tag</label>
+          <div *ngIf="!isEditMode" class="value">{{ agent.roleTag || '—' }}</div>
+          <input 
+            *ngIf="isEditMode" 
+            type="text" 
+            [(ngModel)]="editedAgent.roleTag" 
+            placeholder="Short identifier"
+            class="input"
+          />
+        </div>
+
+        <!-- Level -->
+        <div class="field">
+          <label>Level</label>
+          <div *ngIf="!isEditMode">
+            <app-level-badge [level]="agent.level"></app-level-badge>
+          </div>
+          <select 
+            *ngIf="isEditMode" 
+            [(ngModel)]="editedAgent.level" 
+            class="select"
+          >
+            <option *ngFor="let level of agentLevels" [value]="level">{{ level }}</option>
+          </select>
+        </div>
+
+        <!-- Status -->
+        <div class="field">
+          <label>Status</label>
+          <div *ngIf="!isEditMode">
+            <app-status-badge [status]="agent.status"></app-status-badge>
+          </div>
+          <select 
+            *ngIf="isEditMode" 
+            [(ngModel)]="editedAgent.status" 
+            class="select"
+          >
+            <option *ngFor="let status of agentStatuses" [value]="status">{{ status }}</option>
+          </select>
+        </div>
+
+        <!-- System Prompt -->
+        <div class="field">
+          <label>System Prompt</label>
+          <div *ngIf="!isEditMode" class="value text-area-value">{{ agent.systemPrompt || '—' }}</div>
+          <textarea 
+            *ngIf="isEditMode" 
+            [(ngModel)]="editedAgent.systemPrompt" 
+            rows="4"
+            class="textarea"
+            placeholder="System prompt for the agent"
+          ></textarea>
+        </div>
+
+        <!-- Character -->
+        <div class="field">
+          <label>Character</label>
+          <div *ngIf="!isEditMode" class="value text-area-value">{{ agent.character || '—' }}</div>
+          <textarea 
+            *ngIf="isEditMode" 
+            [(ngModel)]="editedAgent.character" 
+            rows="4"
+            class="textarea"
+            placeholder="Character description"
+          ></textarea>
+        </div>
+
+        <!-- Lore -->
+        <div class="field">
+          <label>Lore</label>
+          <div *ngIf="!isEditMode" class="value text-area-value">{{ agent.lore || '—' }}</div>
+          <textarea 
+            *ngIf="isEditMode" 
+            [(ngModel)]="editedAgent.lore" 
+            rows="4"
+            class="textarea"
+            placeholder="Background/lore information"
+          ></textarea>
+        </div>
+
+        <!-- Save Button -->
+        <div class="field" *ngIf="isEditMode">
+          <button class="save-btn" (click)="saveAgent()">Save Changes</button>
+        </div>
+      </div>
+    </section>
+
+    <!-- Metrics Cards -->
+    <section class="metrics-section">
+      <h3>Metrics</h3>
+      <div class="metrics-grid">
+        <div class="metric-card">
+          <div class="metric-value">{{ (agentStats$ | async)?.missions || 0 }}</div>
+          <div class="metric-label">MISSIONS</div>
+        </div>
+        <div class="metric-card">
+          <div class="metric-value">{{ (agentStats$ | async)?.stepsDone || 0 }}</div>
+          <div class="metric-label">STEPS DONE</div>
+        </div>
+        <div class="metric-card">
+          <div class="metric-value">{{ formatCost((agentStats$ | async)?.costToday || 0) }}</div>
+          <div class="metric-label">COST TODAY</div>
+        </div>
+        <div class="metric-card">
+          <div class="metric-value">{{ (agentStats$ | async)?.events || 0 }}</div>
+          <div class="metric-label">EVENTS</div>
+        </div>
+      </div>
+    </section>
+
+    <!-- Recent Missions -->
+    <section class="missions-section">
+      <h3>Recent Missions</h3>
+      <div class="missions-list" *ngIf="(agentTasks$ | async)?.length; else noMissions">
+        <div class="mission-item" *ngFor="let task of agentTasks$ | async">
+          <div class="mission-title">{{ task.title }}</div>
+          <div class="mission-meta">
+            <span class="mission-status">{{ task.status }}</span>
+            <span class="mission-time">{{ task.createdAt | timeAgo }}</span>
+          </div>
+        </div>
+      </div>
+      <ng-template #noMissions>
+        <div class="empty-state">No missions assigned</div>
+      </ng-template>
+    </section>
+
+    <!-- Recent Steps -->
+    <section class="activities-section">
+      <h3>Recent Steps</h3>
+      <div class="activities-list" *ngIf="(agentActivities$ | async)?.length; else noActivities">
+        <div class="activity-item" *ngFor="let activity of agentActivities$ | async">
+          <div class="activity-header">
+            <div class="activity-status-dot" [style.background-color]="getActivityStatusColor(activity.type)"></div>
+            <div class="activity-type">{{ activity.type }}</div>
+            <div class="activity-time">{{ activity.createdAt | timeAgo }}</div>
+          </div>
+          <div class="activity-message">{{ activity.message }}</div>
+          <div class="activity-task" *ngIf="activity.taskId">
+            Task: {{ activity.taskId }}
+          </div>
+        </div>
+      </div>
+      <ng-template #noActivities>
+        <div class="empty-state">No activities yet</div>
+      </ng-template>
+    </section>
+  </div>
+</div>

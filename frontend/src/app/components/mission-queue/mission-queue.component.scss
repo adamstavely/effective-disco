@@ -5,6 +5,40 @@
   @extend .panel-container;
 }
 
+.header-section {
+  display: flex;
+  flex-direction: column;
+  gap: var(--spacing-3);
+}
+
+.archive-toggle {
+  display: flex;
+  align-items: center;
+  padding: var(--spacing-2) var(--spacing-3);
+  background: var(--color-neutral-50);
+  border-radius: var(--radius-md);
+  
+  .toggle-label {
+    display: flex;
+    align-items: center;
+    gap: var(--spacing-2);
+    cursor: pointer;
+    font-size: var(--font-size-sm);
+    color: var(--color-neutral-600);
+    user-select: none;
+    
+    .toggle-input {
+      cursor: pointer;
+      width: 16px;
+      height: 16px;
+    }
+    
+    .toggle-text {
+      font-weight: var(--font-weight-medium);
+    }
+  }
+}
+
 .kanban-board {
   display: grid;
   grid-template-columns: repeat(5, 1fr);
@@ -71,4 +105,34 @@
   gap: var(--spacing-2);
   overflow-y: auto;
   flex: 1;
+  min-height: 100px;
+}
+
+// CDK drag-drop styles for columns
+.kanban-column.cdk-drop-list-dragging {
+  .task-card:not(.cdk-drag-placeholder) {
+    transition: transform 250ms cubic-bezier(0, 0, 0.2, 1);
+  }
+}
+
+.kanban-column.cdk-drop-list-receiving {
+  background: var(--color-neutral-100);
+}
+
+.empty-column {
+  padding: var(--spacing-4);
+  text-align: center;
+  color: var(--color-neutral-400);
+  font-size: var(--font-size-sm);
+  font-style: italic;
+}
+
+.kanban-board.with-panel {
+  margin-right: 380px;
+  transition: margin-right var(--transition-base);
+}
+
+:host ::ng-deep .task-card.selected {
+  border: 2px solid var(--color-primary-500);
+  box-shadow: var(--shadow-md);
 }

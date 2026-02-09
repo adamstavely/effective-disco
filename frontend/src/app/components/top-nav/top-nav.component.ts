@@ -1,6 +1,6 @@
 import { Component, ChangeDetectionStrategy } from '@angular/core';
 import { CommonModule } from '@angular/common';
-import { ConvexService } from '../../services/convex.service';
+import { SupabaseService } from '../../services/supabase.service';
 import { combineLatest, map, timer, Observable } from 'rxjs';
 
 @Component({
@@ -16,18 +16,18 @@ export class TopNavComponent {
   agentsActive$: Observable<number>;
   tasksInQueue$: Observable<number>;
 
-  constructor(private convexService: ConvexService) {
+  constructor(private supabaseService: SupabaseService) {
     this.currentTime$ = timer(0, 1000).pipe(
       map(() => new Date())
     );
 
-    this.agentsActive$ = this.convexService.getAgents().pipe(
+    this.agentsActive$ = this.supabaseService.getAgents().pipe(
       map(agents => agents.filter(a => a.status === 'active').length)
     );
 
     this.tasksInQueue$ = combineLatest([
-      this.convexService.getTasks('inbox'),
-      this.convexService.getTasks('assigned')
+      this.supabaseService.getTasks('inbox'),
+      this.supabaseService.getTasks('assigned')
     ]).pipe(
       map(([inbox, assigned]) => inbox.length + assigned.length)
     );

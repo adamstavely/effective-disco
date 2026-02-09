@@ -9,6 +9,17 @@
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <script>
+    // Supabase configuration for local development
+    // Defaults to local Supabase CLI instance (http://127.0.0.1:54321)
+    // Override by setting window.SUPABASE_URL and window.SUPABASE_ANON_KEY before this script runs
+    if (!window.SUPABASE_URL) {
+      window.SUPABASE_URL = 'http://127.0.0.1:54321';
+    }
+    if (!window.SUPABASE_ANON_KEY) {
+      window.SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZS1kZW1vIiwicm9sZSI6ImFub24iLCJleHAiOjE5ODM4MTI5OTZ9.CRXP1A7WOeoJeXxjNni43kdQwgnWNReilDMblYTn_I0';
+    }
+  </script>
 </head>
 <body>
   <app-root></app-root>

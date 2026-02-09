@@ -1,8 +1,8 @@
-import { ConvexHttpClient } from "convex/node";
-import { api } from "../../backend/convex/_generated/api";
+import * as agentsFunctions from "../../backend/supabase/functions/agents";
+import * as tasksFunctions from "../../backend/supabase/functions/tasks";
+import * as activitiesFunctions from "../../backend/supabase/functions/activities";
 import * as cron from "node-cron";
 
-const convexClient = new ConvexHttpClient(process.env.CONVEX_URL || "");
 
 async function generateStandup(): Promise<string> {
   const today = new Date();
@@ -10,13 +10,13 @@ async function generateStandup(): Promise<string> {
   const endOfDay = new Date(today.setHours(23, 59, 59, 999)).getTime();
 
   // Get all agents
-  const agents = await convexClient.query(api.agents.getAll, {});
+  const agents = await agentsFunctions.getAllAgents();
 
   // Get all tasks
-  const allTasks = await convexClient.query(api.tasks.getAll, {});
+  const allTasks = await tasksFunctions.getAllTasks();
 
   // Get today's activities
-  const activities = await convexClient.query(api.activities.getFeed, { limit: 100 });
+  const activities = await activitiesFunctions.getActivityFeed(100);
   const todayActivities = activities.filter(
     (a) => a.createdAt >= startOfDay && a.createdAt <= endOfDay
   );
@@ -29,7 +29,7 @@ async function generateStandup(): Promise<string> {
 
   for (const task of allTasks) {
     const assignees = task.assigneeIds.map((id) => {
-      const agent = agents.find((a) => a._id === id);
+      const agent = agents.find((a) => a.id === id);
       return agent?.name || "Unknown";
     });
 

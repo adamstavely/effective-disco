@@ -1,0 +1,29 @@
+<div class="document-conversation-tray" *ngIf="document">
+  <div class="tray-header">
+    <div class="header-content">
+      <h2 class="tray-title">Conversation</h2>
+      <button class="close-button" (click)="onClose()" type="button" aria-label="Close">
+        ×
+      </button>
+    </div>
+  </div>
+
+  <div class="tray-content">
+    <div *ngIf="messagesWithAgents$ | async as messages">
+      <div *ngIf="messages.length > 0; else noMessages" class="messages-list">
+        <div *ngFor="let message of messages" class="message-item">
+          <div class="message-header">
+            <span class="message-agent">{{ message.agentName }}</span>
+            <span class="message-time">{{ message.createdAt | timeAgo }}</span>
+          </div>
+          <div class="message-content" [innerHTML]="message.content | markdown"></div>
+        </div>
+      </div>
+      <ng-template #noMessages>
+        <div class="empty-state">
+          <p>No messages related to this document</p>
+        </div>
+      </ng-template>
+    </div>
+  </div>
+</div>

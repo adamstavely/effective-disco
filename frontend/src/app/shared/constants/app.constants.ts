@@ -6,7 +6,8 @@ export const TASK_STATUS_LABELS: Record<TaskStatus, string> = {
   in_progress: 'IN PROGRESS',
   review: 'REVIEW',
   done: 'DONE',
-  blocked: 'BLOCKED'
+  blocked: 'BLOCKED',
+  archived: 'ARCHIVED'
 };
 
 export const ACTIVITY_TYPE_LABELS: Record<ActivityType | 'all', string> = {
@@ -15,7 +16,11 @@ export const ACTIVITY_TYPE_LABELS: Record<ActivityType | 'all', string> = {
   message_sent: 'Comments',
   document_created: 'Docs',
   task_assigned: 'Status',
-  status_changed: 'Status'
+  status_changed: 'Status',
+  proposal_created: 'Proposals',
+  proposal_approved: 'Proposals',
+  proposal_rejected: 'Proposals',
+  proposal_converted: 'Proposals'
 };
 
 export const TASK_STATUS_COLORS: Record<TaskStatus, string> = {
@@ -24,7 +29,8 @@ export const TASK_STATUS_COLORS: Record<TaskStatus, string> = {
   in_progress: 'success',
   review: 'warning',
   done: 'success',
-  blocked: 'error'
+  blocked: 'error',
+  archived: 'default'
 };
 
 export const TASK_STATUSES: TaskStatus[] = [
@@ -33,7 +39,8 @@ export const TASK_STATUSES: TaskStatus[] = [
   'in_progress',
   'review',
   'done',
-  'blocked'
+  'blocked',
+  'archived'
 ];
 
 export const KANBAN_STATUSES: TaskStatus[] = [
