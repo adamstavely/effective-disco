@@ -1,8 +1,15 @@
 <div class="agents-panel">
-  <app-panel-header 
-    title="AGENTS" 
-    [count]="(agents$ | async)?.length">
-  </app-panel-header>
+  <div class="header-section">
+    <div class="header-left">
+      <app-panel-header 
+        title="AGENTS" 
+        [count]="(agents$ | async)?.length">
+      </app-panel-header>
+      <button class="create-agent-btn" (click)="openCreateAgentDialog()" type="button">
+        + Create Agent
+      </button>
+    </div>
+  </div>
   <div class="agents-list">
     <app-agent-card
       *ngFor="let agent of agents$ | async"
@@ -16,4 +23,132 @@
     [agent]="selectedAgent$ | async"
     (close)="closeTray()"
   ></app-agent-detail-tray>
+
+  <!-- Create Agent Dialog -->
+  <div *ngIf="showCreateAgentDialog" class="dialog-overlay" (click)="closeCreateAgentDialog()">
+    <div class="dialog" (click)="$event.stopPropagation()">
+      <div class="dialog-header">
+        <h3>Create New Agent</h3>
+        <button class="close-btn" (click)="closeCreateAgentDialog()" type="button">×</button>
+      </div>
+      <div class="dialog-content">
+        <div class="form-group">
+          <label for="agent-name">Name *</label>
+          <input
+            id="agent-name"
+            type="text"
+            [(ngModel)]="newAgentName"
+            placeholder="Enter agent name"
+            class="form-input"
+            [disabled]="isCreatingAgent"
+          />
+        </div>
+        <div class="form-group">
+          <label for="agent-role">Role *</label>
+          <input
+            id="agent-role"
+            type="text"
+            [(ngModel)]="newAgentRole"
+            placeholder="Enter agent role"
+            class="form-input"
+            [disabled]="isCreatingAgent"
+          />
+        </div>
+        <div class="form-group">
+          <label for="agent-level">Level *</label>
+          <select
+            id="agent-level"
+            [(ngModel)]="newAgentLevel"
+            class="form-select"
+            [disabled]="isCreatingAgent"
+          >
+            <option value="intern">Intern</option>
+            <option value="specialist">Specialist</option>
+            <option value="lead">Lead</option>
+          </select>
+        </div>
+        <div class="form-group">
+          <label for="agent-session-key">Session Key (optional)</label>
+          <input
+            id="agent-session-key"
+            type="text"
+            [(ngModel)]="newAgentSessionKey"
+            placeholder="Auto-generated from role if empty"
+            class="form-input"
+            [disabled]="isCreatingAgent"
+          />
+          <p class="form-hint">Leave empty to auto-generate from role (format: agent:role-slug:main)</p>
+        </div>
+        <div class="form-group">
+          <label for="agent-avatar">Avatar (optional)</label>
+          <input
+            id="agent-avatar"
+            type="text"
+            [(ngModel)]="newAgentAvatar"
+            placeholder="Emoji or image URL"
+            class="form-input"
+            [disabled]="isCreatingAgent"
+          />
+          <p class="form-hint">Enter an emoji or image URL for the agent avatar</p>
+        </div>
+        <div class="form-group">
+          <label for="agent-role-tag">Role Tag (optional)</label>
+          <input
+            id="agent-role-tag"
+            type="text"
+            [(ngModel)]="newAgentRoleTag"
+            placeholder="Short identifier"
+            class="form-input"
+            [disabled]="isCreatingAgent"
+          />
+        </div>
+        <div class="form-group">
+          <label for="agent-system-prompt">System Prompt (optional)</label>
+          <textarea
+            id="agent-system-prompt"
+            [(ngModel)]="newAgentSystemPrompt"
+            placeholder="System prompt for the agent"
+            rows="4"
+            class="form-textarea"
+            [disabled]="isCreatingAgent"
+          ></textarea>
+        </div>
+        <div class="form-group">
+          <label for="agent-character">Character (optional)</label>
+          <textarea
+            id="agent-character"
+            [(ngModel)]="newAgentCharacter"
+            placeholder="Character description"
+            rows="4"
+            class="form-textarea"
+            [disabled]="isCreatingAgent"
+          ></textarea>
+        </div>
+        <div class="form-group">
+          <label for="agent-lore">Lore (optional)</label>
+          <textarea
+            id="agent-lore"
+            [(ngModel)]="newAgentLore"
+            placeholder="Background/lore information"
+            rows="4"
+            class="form-textarea"
+            [disabled]="isCreatingAgent"
+          ></textarea>
+        </div>
+      </div>
+      <div class="dialog-actions">
+        <button class="btn-cancel" (click)="closeCreateAgentDialog()" [disabled]="isCreatingAgent" type="button">
+          Cancel
+        </button>
+        <button
+          class="btn-primary"
+          (click)="onCreateAgent()"
+          [disabled]="!newAgentName.trim() || !newAgentRole.trim() || isCreatingAgent"
+          type="button"
+        >
+          {{ isCreatingAgent ? 'Creating...' : 'Create Agent' }}
+        </button>
+      </div>
+    </div>
+  </div>
 </div>

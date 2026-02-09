@@ -85,6 +85,54 @@ export class SupabaseService {
     });
   }
 
+  createAgent(
+    name: string,
+    role: string,
+    sessionKey: string,
+    level: 'intern' | 'specialist' | 'lead',
+    options?: {
+      avatar?: string | null;
+      roleTag?: string | null;
+      systemPrompt?: string | null;
+      character?: string | null;
+      lore?: string | null;
+    }
+  ): Promise<string> {
+    if (!this.client) return Promise.reject(new Error('Supabase client not initialized'));
+    
+    const tenantId = this.getTenantId();
+    const now = Date.now();
+    
+    const insertData: any = {
+      name,
+      role,
+      session_key: sessionKey,
+      level,
+      status: 'idle',
+      last_heartbeat: now,
+      tenant_id: tenantId
+    };
+
+    // Add optional fields if provided
+    if (options) {
+      if (options.avatar !== undefined) insertData.avatar = options.avatar;
+      if (options.roleTag !== undefined) insertData.role_tag = options.roleTag;
+      if (options.systemPrompt !== undefined) insertData.system_prompt = options.systemPrompt;
+      if (options.character !== undefined) insertData.character = options.character;
+      if (options.lore !== undefined) insertData.lore = options.lore;
+    }
+    
+    return Promise.resolve(this.client.from('agents')
+      .insert(insertData)
+      .select('id')
+      .single())
+      .then(({ data: agent, error }) => {
+        if (error) throw error;
+        if (!agent) throw new Error('Agent creation failed');
+        return agent.id;
+      });
+  }
+
   // Tasks
   getTasks(status?: string): Observable<Task[]> {
     if (!this.client) {
