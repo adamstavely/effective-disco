@@ -1,5 +1,10 @@
 <div class="proposals">
-  <app-panel-header title="PROPOSALS"></app-panel-header>
+  <div class="proposals-header">
+    <app-panel-header title="PROPOSALS"></app-panel-header>
+    <button class="create-proposal-btn" (click)="openCreateProposalDialog()" type="button">
+      + Create Proposal
+    </button>
+  </div>
   
   <div class="proposals-tabs">
     <app-filter-button
@@ -46,5 +51,65 @@
         <p>Loading proposals...</p>
       </div>
     </ng-template>
+  </div>
+
+  <!-- Create Proposal Dialog -->
+  <div *ngIf="showCreateProposalDialog" class="dialog-overlay" (click)="closeCreateProposalDialog()">
+    <div class="dialog" (click)="$event.stopPropagation()">
+      <div class="dialog-header">
+        <h3>Create New Proposal</h3>
+        <button class="close-btn" (click)="closeCreateProposalDialog()" type="button">×</button>
+      </div>
+      <div class="dialog-content">
+        <div class="form-group">
+          <label for="proposal-title">Title *</label>
+          <input
+            id="proposal-title"
+            type="text"
+            [(ngModel)]="newProposalTitle"
+            placeholder="Enter proposal title"
+            class="form-input"
+            [disabled]="isCreatingProposal"
+          />
+        </div>
+        <div class="form-group">
+          <label for="proposal-description">Description *</label>
+          <textarea
+            id="proposal-description"
+            [(ngModel)]="newProposalDescription"
+            placeholder="Describe what needs to be done"
+            rows="5"
+            class="form-textarea"
+            [disabled]="isCreatingProposal"
+          ></textarea>
+        </div>
+        <div class="form-group">
+          <label for="proposal-priority">Priority</label>
+          <select
+            id="proposal-priority"
+            [(ngModel)]="newProposalPriority"
+            class="form-select"
+            [disabled]="isCreatingProposal"
+          >
+            <option value="low">Low</option>
+            <option value="medium">Medium</option>
+            <option value="high">High</option>
+          </select>
+        </div>
+      </div>
+      <div class="dialog-actions">
+        <button class="btn-cancel" (click)="closeCreateProposalDialog()" [disabled]="isCreatingProposal" type="button">
+          Cancel
+        </button>
+        <button
+          class="btn-primary"
+          (click)="onCreateProposal()"
+          [disabled]="!newProposalTitle.trim() || !newProposalDescription.trim() || isCreatingProposal"
+          type="button"
+        >
+          {{ isCreatingProposal ? 'Creating...' : 'Create Proposal' }}
+        </button>
+      </div>
+    </div>
   </div>
 </div>

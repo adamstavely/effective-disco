@@ -12,18 +12,21 @@ async function initializeAgents() {
       role: "Squad Lead",
       sessionKey: "agent:main:main",
       level: "lead" as const,
+      tenantId: "00000000-0000-0000-0000-000000000000",
     },
     {
       name: "Shuri",
       role: "Product Analyst",
       sessionKey: "agent:product-analyst:main",
       level: "specialist" as const,
+      tenantId: "00000000-0000-0000-0000-000000000000",
     },
     {
       name: "Friday",
       role: "Developer",
       sessionKey: "agent:developer:main",
       level: "specialist" as const,
+      tenantId: "00000000-0000-0000-0000-000000000000",
     },
   ];
 

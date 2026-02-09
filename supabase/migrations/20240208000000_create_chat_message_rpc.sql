@@ -1,3 +1,6 @@
+-- Migration: Create RPC function for chat messages
+-- This function creates chat messages with tenant_id support
+
 -- RPC function to create a chat message with mentions and attachments
 -- p_from_agent_id can be NULL for user messages, or UUID for agent messages
 CREATE OR REPLACE FUNCTION create_chat_message(
@@ -12,7 +15,6 @@ DECLARE
   v_message_id UUID;
   v_now BIGINT;
   v_tenant_id UUID;
-  v_participant_ids UUID[];
 BEGIN
   v_now := EXTRACT(EPOCH FROM NOW()) * 1000;
   
@@ -44,29 +46,6 @@ BEGIN
       FALSE,
       v_now,
       v_tenant_id;
-  END IF;
-  
-  -- For agent-to-agent messages (p_from_agent_id IS NOT NULL), create notifications for other participants
-  IF p_from_agent_id IS NOT NULL THEN
-    -- Get participant_agent_ids from chat_threads
-    SELECT participant_agent_ids INTO v_participant_ids
-    FROM chat_threads
-    WHERE id = p_chat_thread_id;
-    
-    -- If this is an agent-to-agent thread, notify all other participants
-    IF v_participant_ids IS NOT NULL AND array_length(v_participant_ids, 1) >= 2 THEN
-      -- Create notifications for all participants except the sender
-      INSERT INTO notifications (mentioned_agent_id, content, task_id, delivered, created_at, tenant_id)
-      SELECT 
-        participant_id,
-        p_content,
-        NULL,
-        FALSE,
-        v_now,
-        v_tenant_id
-      FROM unnest(v_participant_ids) AS participant_id
-      WHERE participant_id != p_from_agent_id;
-    END IF;
   END IF;
   
   -- Insert attachments if provided

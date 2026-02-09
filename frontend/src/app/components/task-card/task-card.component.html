@@ -1,13 +1,30 @@
 <div class="task-card" 
      [class.has-border-color]="task.borderColor" 
      [class.selected]="selected"
+     [class.bulk-selected]="isBulkMode && isSelected"
      [style.border-color]="task.borderColor || ''" 
      cdkDrag>
-  <div class="drag-handle" cdkDragHandle>
-    <span class="drag-icon">⋮</span>
+  <div class="bulk-checkbox" *ngIf="isBulkMode">
+    <input 
+      type="checkbox" 
+      [checked]="isSelected"
+      (change)="selectionChange.emit()"
+      (click)="$event.stopPropagation()"
+      class="checkbox-input"
+    />
+  </div>
+  <div class="drag-handle" cdkDragHandle *ngIf="!isBulkMode">
+    <lucide-icon name="grip-vertical" [size]="16" class="drag-icon"></lucide-icon>
   </div>
   <div class="task-content">
-    <div class="task-title">{{ task.title }}</div>
+    <div class="task-header">
+      <div class="task-title">{{ task.title }}</div>
+      <div class="priority-badge" [class.priority-high]="task.priority === 'high'" 
+           [class.priority-medium]="task.priority === 'medium'" 
+           [class.priority-low]="task.priority === 'low'">
+        {{ task.priority | titlecase }}
+      </div>
+    </div>
     <div class="task-description">{{ getDescriptionSnippet() }}</div>
     <div class="task-meta">
       <div class="task-time-info">
@@ -31,17 +48,17 @@
           (click)="onPlayClick($event)"
           title="Resume task"
           type="button">
-          ▶
+          <lucide-icon name="play" [size]="16"></lucide-icon>
         </button>
         <button 
           class="action-button archive-button" 
           (click)="onArchiveClick($event)"
           title="Archive task"
           type="button">
-          📦
+          <lucide-icon name="archive" [size]="16"></lucide-icon>
         </button>
       </div>
-      <span class="expand-icon">▲</span>
+      <lucide-icon name="chevron-up" [size]="16" class="expand-icon"></lucide-icon>
     </div>
   </div>
 </div>

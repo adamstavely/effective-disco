@@ -10,11 +10,12 @@ import { DocumentTraysComponent } from '../document-trays/document-trays.compone
 import { TASK_STATUS_LABELS, TASK_STATUSES } from '../../shared/constants/app.constants';
 import { Observable, combineLatest, of, BehaviorSubject, firstValueFrom } from 'rxjs';
 import { map, switchMap, catchError } from 'rxjs/operators';
+import { LucideAngularModule } from 'lucide-angular';
 
 @Component({
   selector: 'app-task-detail-panel',
   standalone: true,
-  imports: [CommonModule, FormsModule, TimeAgoPipe, MarkdownPipe, TagComponent, DocumentTraysComponent],
+  imports: [CommonModule, FormsModule, TimeAgoPipe, MarkdownPipe, TagComponent, DocumentTraysComponent, LucideAngularModule],
   templateUrl: './task-detail-panel.component.html',
   styleUrl: './task-detail-panel.component.scss',
   changeDetection: ChangeDetectionStrategy.OnPush
@@ -34,6 +35,7 @@ export class TaskDetailPanelComponent implements OnChanges {
   newDocumentContent = '';
   newDocumentType: Document['type'] = 'other';
   selectedDocument: Document | null = null;
+  handoffFromAgentId: string | null = null;
 
   private taskSubject = new BehaviorSubject<Task | null>(null);
   agents$: Observable<Agent[]>;
@@ -41,6 +43,9 @@ export class TaskDetailPanelComponent implements OnChanges {
   messagesWithAgents$: Observable<Array<Message & { agentName: string }>>;
   documents$: Observable<Document[]>;
   assignees$: Observable<Agent[]>;
+  dependentTasks$: Observable<Task[]>;
+  tasksThisDependsOn$: Observable<Task[]>;
+  allTasks$: Observable<Task[]>;
 
   readonly TASK_STATUS_LABELS = TASK_STATUS_LABELS;
   readonly TASK_STATUSES = TASK_STATUSES;
@@ -111,6 +116,35 @@ export class TaskDetailPanelComponent implements OnChanges {
         if (!task) return [];
         const assigneeIds = task.assigneeIds || [];
         return agents.filter(agent => assigneeIds.includes(agent._id));
+      })
+    );
+
+    // All tasks for dependency selection
+    this.allTasks$ = this.supabaseService.getTasks().pipe(
+      catchError(() => of([]))
+    );
+
+    // Dependent tasks (tasks that depend on this task)
+    this.dependentTasks$ = this.taskSubject.pipe(
+      switchMap(task => {
+        if (task) {
+          return this.supabaseService.getDependentTasks(task._id).pipe(
+            catchError(() => of([]))
+          );
+        }
+        return of([]);
+      })
+    );
+
+    // Tasks this task depends on
+    this.tasksThisDependsOn$ = this.taskSubject.pipe(
+      switchMap(task => {
+        if (task) {
+          return this.supabaseService.getTasksThisDependsOn(task._id).pipe(
+            catchError(() => of([]))
+          );
+        }
+        return of([]);
       })
     );
   }
@@ -238,6 +272,96 @@ export class TaskDetailPanelComponent implements OnChanges {
     }
   }
 
+  async autoAssign(): Promise<void> {
+    if (!this.task) return;
+    
+    try {
+      const suggestedAgentIds = await firstValueFrom(
+        this.supabaseService.suggestTaskAssignment(this.task._id)
+      );
+      
+      if (suggestedAgentIds && suggestedAgentIds.length > 0) {
+        // Replace existing assignees with suggested ones
+        await this.supabaseService.updateTask(this.task._id, { assigneeIds: suggestedAgentIds });
+        this.cdr.markForCheck();
+      } else {
+        alert('No available agents found for auto-assignment.');
+      }
+    } catch (error) {
+      console.error('Error auto-assigning task:', error);
+      alert('Failed to auto-assign task. Please try manually assigning.');
+    }
+  }
+
+  async handoffTask(fromAgentId: string, toAgentId: string): Promise<void> {
+    if (!this.task) return;
+    
+    try {
+      const currentAssignees = this.task.assigneeIds || [];
+      
+      // Remove the source agent and add the target agent
+      const newAssignees = currentAssignees
+        .filter(id => id !== fromAgentId)
+        .concat(toAgentId);
+      
+      await this.supabaseService.updateTask(this.task._id, { assigneeIds: newAssignees });
+      
+      // Post a message about the handoff
+      const agents = await firstValueFrom(this.agents$);
+      const fromAgent = agents.find(a => a._id === fromAgentId);
+      const toAgent = agents.find(a => a._id === toAgentId);
+      
+      if (fromAgent && toAgent) {
+        await this.supabaseService.createMessage(
+          this.task._id,
+          null, // System message (not from an agent)
+          `Task handed off from ${fromAgent.name} to ${toAgent.name}`
+        );
+      }
+      
+      this.cdr.markForCheck();
+    } catch (error) {
+      console.error('Error handing off task:', error);
+      alert('Failed to handoff task.');
+    }
+  }
+
+  async addCollaborator(agentId: string): Promise<void> {
+    if (!this.task) return;
+    
+    const currentAssignees = this.task.assigneeIds || [];
+    if (!currentAssignees.includes(agentId)) {
+      await this.addAssignee(agentId);
+      
+      // Post a message about collaboration
+      const agents = await firstValueFrom(this.agents$);
+      const agent = agents.find(a => a._id === agentId);
+      
+      if (agent) {
+        await this.supabaseService.createMessage(
+          this.task._id,
+          null, // System message (not from an agent)
+          `${agent.name} joined as collaborator`
+        );
+      }
+    }
+  }
+
+  showHandoffDialog(fromAgentId: string): void {
+    this.handoffFromAgentId = fromAgentId;
+  }
+
+  cancelHandoff(): void {
+    this.handoffFromAgentId = null;
+  }
+
+  async confirmHandoff(toAgentId: string): Promise<void> {
+    if (!this.handoffFromAgentId) return;
+    
+    await this.handoffTask(this.handoffFromAgentId, toAgentId);
+    this.handoffFromAgentId = null;
+  }
+
   markAsDone(): void {
     this.updateStatus('done');
   }
@@ -283,10 +407,12 @@ export class TaskDetailPanelComponent implements OnChanges {
     this.close.emit();
   }
 
-  getAvailableAgents(agents: Agent[]): Agent[] {
+  getAvailableAgents(agents: Agent[], excludeId?: string): Agent[] {
     if (!this.task) return agents;
     const assigneeIds = this.task.assigneeIds || [];
-    return agents.filter(agent => !assigneeIds.includes(agent._id));
+    return agents.filter(agent => 
+      !assigneeIds.includes(agent._id) && agent._id !== excludeId
+    );
   }
 
   startAddingDocument(): void {
@@ -351,5 +477,52 @@ export class TaskDetailPanelComponent implements OnChanges {
   closeDocumentTrays(): void {
     this.selectedDocument = null;
     this.cdr.markForCheck();
+  }
+
+  // Dependency management
+  isAddingDependency = false;
+  selectedDependencyTaskId: string | null = null;
+
+  startAddingDependency(): void {
+    this.isAddingDependency = true;
+    this.selectedDependencyTaskId = null;
+  }
+
+  cancelAddingDependency(): void {
+    this.isAddingDependency = false;
+    this.selectedDependencyTaskId = null;
+  }
+
+  async addDependency(): Promise<void> {
+    if (!this.task || !this.selectedDependencyTaskId) return;
+    
+    if (this.selectedDependencyTaskId === this.task._id) {
+      alert('A task cannot depend on itself');
+      return;
+    }
+
+    try {
+      await this.supabaseService.addTaskDependency(this.task._id, this.selectedDependencyTaskId);
+      this.cancelAddingDependency();
+      this.cdr.markForCheck();
+    } catch (error: any) {
+      console.error('Error adding dependency:', error);
+      if (error.message && error.message.includes('Circular dependency')) {
+        alert('Cannot create dependency: This would create a circular dependency');
+      } else {
+        alert('Error adding dependency: ' + (error.message || 'Unknown error'));
+      }
+    }
+  }
+
+  async removeDependency(dependsOnTaskId: string): Promise<void> {
+    if (!this.task) return;
+    
+    try {
+      await this.supabaseService.removeTaskDependency(this.task._id, dependsOnTaskId);
+      this.cdr.markForCheck();
+    } catch (error) {
+      console.error('Error removing dependency:', error);
+    }
   }
 }

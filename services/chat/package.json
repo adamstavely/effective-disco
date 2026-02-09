@@ -1,0 +1,17 @@
+{
+  "name": "mission-control-chat",
+  "version": "1.0.0",
+  "type": "module",
+  "scripts": {
+    "dev": "tsx daemon.ts",
+    "start": "node dist/daemon.js"
+  },
+  "dependencies": {
+    "dotenv": "^16.4.1"
+  },
+  "devDependencies": {
+    "@types/node": "^20.11.0",
+    "tsx": "^4.7.0",
+    "typescript": "^5.3.3"
+  }
+}

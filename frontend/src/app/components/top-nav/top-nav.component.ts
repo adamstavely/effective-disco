@@ -3,11 +3,12 @@ import { CommonModule } from '@angular/common';
 import { SupabaseService } from '../../services/supabase.service';
 import { TenantSelectorComponent } from '../tenant-selector/tenant-selector.component';
 import { combineLatest, map, timer, Observable } from 'rxjs';
+import { LucideAngularModule } from 'lucide-angular';
 
 @Component({
   selector: 'app-top-nav',
   standalone: true,
-  imports: [CommonModule, TenantSelectorComponent],
+  imports: [CommonModule, TenantSelectorComponent, LucideAngularModule],
   templateUrl: './top-nav.component.html',
   styleUrl: './top-nav.component.scss',
   changeDetection: ChangeDetectionStrategy.OnPush

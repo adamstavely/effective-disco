@@ -2,9 +2,27 @@
   <div class="chat-sidebar">
     <div class="sidebar-header">
       <h2 class="sidebar-title">Chat Threads</h2>
-      <button class="new-thread-btn" (click)="createNewThread()" type="button">
-        + New Thread
-      </button>
+      <div class="header-buttons">
+        <button 
+          class="new-thread-btn" 
+          (click)="createNewThread()" 
+          [disabled]="isCreatingThread"
+          type="button">
+          {{ isCreatingThread ? 'Creating...' : '+ New Thread' }}
+        </button>
+        <button 
+          class="agent-to-agent-btn" 
+          (click)="openAgentToAgentDialog()" 
+          type="button" 
+          title="Create agent-to-agent chat thread">
+          <lucide-icon name="bot" [size]="16"></lucide-icon>
+          Agent Chat
+        </button>
+        <button class="broadcast-btn" (click)="openBroadcastDialog()" type="button" title="Broadcast message to all agents">
+          <lucide-icon name="megaphone" [size]="16"></lucide-icon>
+          Broadcast
+        </button>
+      </div>
     </div>
     
     <div class="agent-selector">
@@ -21,18 +39,22 @@
     </div>
 
     <div class="threads-list" *ngIf="chatThreads$ | async as threads">
-      <div 
-        *ngFor="let thread of threads" 
-        class="thread-item"
-        [class.selected]="(selectedThreadId$ | async) === thread._id"
-        (click)="selectThread(thread._id)">
-        <div class="thread-title">
-          {{ thread.title || 'Untitled Thread' }}
+      <ng-container *ngIf="agents$ | async as agents">
+        <div 
+          *ngFor="let thread of threads" 
+          class="thread-item"
+          [class.selected]="(selectedThreadId$ | async) === thread._id"
+          [class.agent-to-agent]="thread.participantAgentIds && thread.participantAgentIds.length >= 2"
+          (click)="selectThread(thread._id)">
+          <div class="thread-title">
+            {{ getThreadDisplayName(thread, agents) }}
+          </div>
+          <div class="thread-meta">
+            <span *ngIf="thread.participantAgentIds && thread.participantAgentIds.length >= 2" class="thread-type-badge">Agent Chat</span>
+            {{ thread.updatedAt | timeAgo }}
+          </div>
         </div>
-        <div class="thread-meta">
-          {{ thread.updatedAt | timeAgo }}
-        </div>
-      </div>
+      </ng-container>
       <div *ngIf="threads.length === 0" class="empty-state">
         <p>No chat threads yet</p>
         <p class="empty-hint">Create a new thread to start chatting</p>
@@ -43,7 +65,13 @@
   <div class="chat-main">
     <div *ngIf="selectedThreadId$ | async; else noThreadSelected" class="chat-messages-container">
       <div class="messages-list" *ngIf="messagesWithAgents$ | async as messages">
-        <div *ngFor="let message of messages" class="message-item" [class.user-message]="message.isUser" [class.agent-message]="!message.isUser">
+        <div 
+          *ngFor="let message of messages" 
+          class="message-item" 
+          [class.user-message]="message.isUser" 
+          [class.agent-message]="!message.isUser"
+          (mouseenter)="onMessageMouseEnter(message._id)"
+          (mouseleave)="onMessageMouseLeave()">
           <div class="message-header">
             <div class="message-avatar" *ngIf="message.senderAvatar">
               <img [src]="message.senderAvatar" [alt]="message.senderName" />
@@ -53,28 +81,100 @@
             </div>
             <div class="message-info">
               <span class="message-sender">{{ message.senderName }}</span>
-              <span class="message-time">{{ message.createdAt | timeAgo }}</span>
+              <span class="message-time">
+                {{ message.createdAt | timeAgo }}
+                <span *ngIf="message.editedAt" class="edited-indicator" title="Edited">(edited)</span>
+              </span>
+            </div>
+            <div class="message-actions" *ngIf="message.isUser && hoveredMessageId === message._id && !editingMessageId">
+              <button 
+                class="edit-btn" 
+                (click)="startEditing(message)"
+                type="button"
+                title="Edit message">
+                <lucide-icon name="edit" [size]="16"></lucide-icon>
+              </button>
+              <button 
+                class="delete-btn" 
+                (click)="deleteMessage(message._id)"
+                [disabled]="isDeletingMessage"
+                type="button"
+                title="Delete message">
+                <lucide-icon name="trash-2" [size]="16"></lucide-icon>
+              </button>
             </div>
           </div>
-          <div class="message-content" [innerHTML]="message.content | markdown"></div>
+          <div class="message-content-wrapper">
+            <div 
+              *ngIf="editingMessageId !== message._id" 
+              class="message-content" 
+              [innerHTML]="message.content | markdown">
+            </div>
+            <div *ngIf="editingMessageId === message._id" class="edit-message-container">
+              <textarea
+                class="edit-message-input"
+                [(ngModel)]="editingMessageContent"
+                (keydown)="onEditKeyDown($event)"
+                rows="3">
+              </textarea>
+              <div class="edit-message-actions">
+                <button 
+                  class="save-edit-btn" 
+                  (click)="saveEdit()"
+                  [disabled]="!editingMessageContent.trim() || isUpdatingMessage"
+                  type="button">
+                  {{ isUpdatingMessage ? 'Saving...' : 'Save' }}
+                </button>
+                <button 
+                  class="cancel-edit-btn" 
+                  (click)="cancelEditing()"
+                  [disabled]="isUpdatingMessage"
+                  type="button">
+                  Cancel
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+        
+        <!-- Agent typing indicator -->
+        <div *ngIf="agentTyping$ | async" class="message-item agent-message typing-indicator">
+          <div class="message-header">
+            <div class="message-avatar">
+              <span class="avatar-initial">A</span>
+            </div>
+            <div class="message-info">
+              <span class="message-sender">Agent</span>
+            </div>
+          </div>
+          <div class="message-content typing-dots">
+            <span></span><span></span><span></span>
+          </div>
         </div>
       </div>
 
-      <div class="message-input-container">
-        <textarea
-          class="message-input"
-          [(ngModel)]="newMessageContent"
-          (keydown)="onKeyDown($event)"
-          placeholder="Type a message... (Press Enter to send, Shift+Enter for new line)"
-          rows="3">
-        </textarea>
-        <button 
-          class="send-button"
-          (click)="sendMessage()"
-          [disabled]="!newMessageContent.trim()"
-          type="button">
-          Send
-        </button>
+      <div class="message-input-container" *ngIf="(selectedThreadId$ | async) as threadId">
+        <ng-container *ngIf="currentThread$ | async as currentThread">
+          <div *ngIf="currentThread && currentThread.participantAgentIds && currentThread.participantAgentIds.length >= 2" class="read-only-notice">
+            <p><lucide-icon name="eye" [size]="16"></lucide-icon> This is an agent-to-agent conversation. You can view messages but agents will communicate with each other.</p>
+          </div>
+          <textarea
+            *ngIf="currentThread && (!currentThread.participantAgentIds || currentThread.participantAgentIds.length < 2)"
+            class="message-input"
+            [(ngModel)]="newMessageContent"
+            (keydown)="onKeyDown($event)"
+              placeholder="Type a message... (Press Enter to send, Shift+Enter for new line)"
+              rows="3">
+            </textarea>
+            <button 
+              *ngIf="currentThread && (!currentThread.participantAgentIds || currentThread.participantAgentIds.length < 2)"
+              class="send-button"
+              (click)="sendMessage()"
+              [disabled]="!newMessageContent.trim() || isSendingMessage"
+              type="button">
+              {{ isSendingMessage ? 'Sending...' : 'Send' }}
+            </button>
+        </ng-container>
       </div>
     </div>
 
@@ -83,5 +183,89 @@
         <p>Select a thread from the sidebar or create a new one to start chatting</p>
       </div>
     </ng-template>
+  </div>
+
+  <!-- Agent-to-Agent Thread Dialog -->
+  <div *ngIf="showAgentToAgentDialog" class="broadcast-dialog-overlay" (click)="closeAgentToAgentDialog()">
+    <div class="broadcast-dialog" (click)="$event.stopPropagation()">
+      <div class="broadcast-dialog-header">
+        <h3>Create Agent-to-Agent Chat</h3>
+        <button class="close-btn" (click)="closeAgentToAgentDialog()" type="button"><lucide-icon name="x" [size]="20"></lucide-icon></button>
+      </div>
+      <div class="broadcast-dialog-content">
+        <p class="broadcast-hint">Select at least 2 agents to create a chat thread between them. Agents will be able to message each other.</p>
+        
+        <div class="agent-selection">
+          <label>Select Agents (minimum 2):</label>
+          <div class="agent-checkboxes" *ngIf="agents$ | async as agents">
+            <label *ngFor="let agent of agents" class="agent-checkbox">
+              <input 
+                type="checkbox" 
+                [checked]="isParticipantSelected(agent._id)"
+                (change)="toggleParticipant(agent._id)"
+              />
+              <span>{{ agent.name }}</span>
+            </label>
+          </div>
+          <p *ngIf="selectedParticipantIds.length > 0" class="selected-count">
+            Selected: {{ selectedParticipantIds.length }} agent(s)
+          </p>
+        </div>
+
+        <div class="thread-title-input">
+          <label for="agent-to-agent-title">Thread Title (optional):</label>
+          <input
+            id="agent-to-agent-title"
+            type="text"
+            [(ngModel)]="agentToAgentThreadTitle"
+            placeholder="e.g., Planning Discussion"
+            class="title-input"
+          />
+        </div>
+      </div>
+      <div class="broadcast-dialog-actions">
+        <button class="cancel-btn" (click)="closeAgentToAgentDialog()" type="button" [disabled]="isCreatingAgentToAgentThread">
+          Cancel
+        </button>
+        <button 
+          class="send-broadcast-btn" 
+          (click)="createAgentToAgentThread()" 
+          [disabled]="selectedParticipantIds.length < 2 || isCreatingAgentToAgentThread"
+          type="button">
+          {{ isCreatingAgentToAgentThread ? 'Creating...' : 'Create Thread' }}
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Broadcast Dialog -->
+  <div *ngIf="showBroadcastDialog" class="broadcast-dialog-overlay" (click)="closeBroadcastDialog()">
+    <div class="broadcast-dialog" (click)="$event.stopPropagation()">
+      <div class="broadcast-dialog-header">
+        <h3>Broadcast Message</h3>
+        <button class="close-btn" (click)="closeBroadcastDialog()" type="button"><lucide-icon name="x" [size]="20"></lucide-icon></button>
+      </div>
+      <div class="broadcast-dialog-content">
+        <p class="broadcast-hint">Send a message to all agents at once. Each agent will receive it in their own chat thread.</p>
+        <textarea
+          class="broadcast-input"
+          [(ngModel)]="broadcastMessage"
+          placeholder="Enter your broadcast message..."
+          rows="5">
+        </textarea>
+      </div>
+      <div class="broadcast-dialog-actions">
+        <button class="cancel-btn" (click)="closeBroadcastDialog()" type="button" [disabled]="isBroadcasting">
+          Cancel
+        </button>
+        <button 
+          class="send-broadcast-btn" 
+          (click)="sendBroadcast()" 
+          [disabled]="!broadcastMessage.trim() || isBroadcasting"
+          type="button">
+          {{ isBroadcasting ? 'Sending...' : 'Send Broadcast' }}
+        </button>
+      </div>
+    </div>
   </div>
 </div>

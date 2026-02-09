@@ -318,4 +318,49 @@ export class Agent {
     const lines = this.sessionHistory.map((entry) => JSON.stringify(entry));
     await fs.writeFile(sessionFile, lines.join("\n") + "\n", "utf-8");
   }
+
+  /**
+   * Load chat history from database messages
+   * This allows agents to access chat context when responding to chat messages
+   */
+  async loadChatHistory(chatMessages: Array<{
+    id: string;
+    chat_thread_id: string;
+    from_agent_id: string | null;
+    content: string;
+    created_at: number;
+    tenant_id: string;
+  }>): Promise<void> {
+    // Clear existing session history or merge intelligently
+    // For chat, we'll replace with chat history to ensure context is correct
+    this.sessionHistory = [];
+
+    // Convert chat messages to session history format
+    for (const msg of chatMessages) {
+      if (msg.from_agent_id === null) {
+        // User message
+        this.sessionHistory.push({
+          role: "human",
+          content: msg.content
+        });
+      } else {
+        // Agent message
+        this.sessionHistory.push({
+          role: "assistant",
+          content: msg.content
+        });
+      }
+    }
+  }
+
+  /**
+   * Save chat message to database (called after agent responds)
+   * This is handled by the chat daemon, but agents can use this if needed
+   */
+  async saveChatMessage(threadId: string, content: string, agentId: string): Promise<void> {
+    // This is typically handled by the chat daemon, but we keep the method
+    // for potential direct use cases
+    // The actual implementation would require Supabase client access
+    // which is better handled at the daemon level
+  }
 }

@@ -30,7 +30,7 @@
           </option>
         </select>
       </div>
-      <button class="close-button" (click)="onClose()" aria-label="Close panel">×</button>
+      <button class="close-button" (click)="onClose()" aria-label="Close panel"><lucide-icon name="x" [size]="20"></lucide-icon></button>
     </div>
   </div>
 
@@ -69,7 +69,7 @@
         <div class="tags-list" *ngIf="task.tags && task.tags.length > 0">
           <div *ngFor="let tag of task.tags" class="tag-item">
             <app-tag [text]="tag"></app-tag>
-            <button class="tag-remove" (click)="removeTag(tag)" aria-label="Remove tag">×</button>
+            <button class="tag-remove" (click)="removeTag(tag)" aria-label="Remove tag"><lucide-icon name="x" [size]="16"></lucide-icon></button>
           </div>
         </div>
         <div *ngIf="!isAddingTag" class="add-tag-button" (click)="isAddingTag = true">
@@ -93,12 +93,25 @@
     <div class="section">
       <div class="section-header">
         <h3>Assignees</h3>
+        <button class="auto-assign-btn" (click)="autoAssign()" title="Auto-assign based on workload and availability">
+          Auto-Assign
+        </button>
       </div>
       <div class="section-content">
         <div class="assignees-list" *ngIf="assignees$ | async as assignees">
           <div *ngFor="let assignee of assignees" class="assignee-item">
             <span>{{ assignee.name }}</span>
-            <button class="remove-button" (click)="removeAssignee(assignee._id)" aria-label="Remove assignee">×</button>
+            <div class="assignee-actions">
+              <button 
+                *ngIf="assignees.length > 1"
+                class="handoff-button" 
+                (click)="showHandoffDialog(assignee._id)"
+                title="Handoff to another agent"
+              >
+                <lucide-icon name="arrow-right" [size]="16"></lucide-icon>
+              </button>
+              <button class="remove-button" (click)="removeAssignee(assignee._id)" aria-label="Remove assignee"><lucide-icon name="x" [size]="16"></lucide-icon></button>
+            </div>
           </div>
         </div>
         <select
@@ -111,6 +124,27 @@
             {{ agent.name }} ({{ agent.role }})
           </option>
         </select>
+
+        <!-- Handoff Dialog -->
+        <div *ngIf="handoffFromAgentId && (agents$ | async) as agents" class="handoff-dialog">
+          <div class="handoff-dialog-content">
+            <h4>Handoff Task</h4>
+            <p>Select an agent to handoff this task to:</p>
+            <select class="handoff-select" #handoffSelect>
+              <option value="">Select agent...</option>
+              <option 
+                *ngFor="let agent of getAvailableAgents(agents, handoffFromAgentId)" 
+                [value]="agent._id"
+              >
+                {{ agent.name }} ({{ agent.role }})
+              </option>
+            </select>
+            <div class="handoff-actions">
+              <button class="handoff-confirm-btn" (click)="confirmHandoff(handoffSelect.value)">Handoff</button>
+              <button class="handoff-cancel-btn" (click)="cancelHandoff()">Cancel</button>
+            </div>
+          </div>
+        </div>
       </div>
     </div>
 
@@ -209,6 +243,80 @@
           <button class="action-button archive-button" (click)="archiveTask()">
             Archive
           </button>
+        </div>
+      </div>
+    </div>
+
+    <!-- Dependencies -->
+    <div class="section">
+      <div class="section-header">
+        <h3>Dependencies</h3>
+      </div>
+      <div class="section-content">
+        <!-- Tasks this task depends on -->
+        <div class="dependency-group">
+          <h4>Depends On</h4>
+          <div class="dependency-list" *ngIf="tasksThisDependsOn$ | async as dependsOnTasks">
+            <div *ngIf="dependsOnTasks.length === 0" class="empty-state">
+              No dependencies
+            </div>
+            <div *ngFor="let depTask of dependsOnTasks" class="dependency-item">
+              <span class="dependency-task-title" [class.blocked]="depTask.status !== 'done'">
+                {{ depTask.title }}
+              </span>
+              <span class="dependency-status" [class.complete]="depTask.status === 'done'">
+                <lucide-icon *ngIf="depTask.status === 'done'" name="check" [size]="16"></lucide-icon>
+                <span *ngIf="depTask.status !== 'done'">{{ TASK_STATUS_LABELS[depTask.status] }}</span>
+              </span>
+              <button class="dependency-remove" (click)="removeDependency(depTask._id)" aria-label="Remove dependency">
+                <lucide-icon name="x" [size]="16"></lucide-icon>
+              </button>
+            </div>
+          </div>
+          <div *ngIf="!isAddingDependency" class="add-dependency-button" (click)="startAddingDependency()">
+            + Add Dependency
+          </div>
+          <div *ngIf="isAddingDependency" class="dependency-input-container">
+            <select
+              [(ngModel)]="selectedDependencyTaskId"
+              class="dependency-select"
+            >
+              <option [value]="null">Select a task...</option>
+              <option
+                *ngFor="let t of allTasks$ | async"
+                [value]="t._id"
+                [disabled]="t._id === task._id"
+              >
+                {{ t.title }} ({{ TASK_STATUS_LABELS[t.status] }})
+              </option>
+            </select>
+            <div class="dependency-actions">
+              <button class="btn-primary" (click)="addDependency()" [disabled]="!selectedDependencyTaskId">
+                Add
+              </button>
+              <button class="btn-secondary" (click)="cancelAddingDependency()">
+                Cancel
+              </button>
+            </div>
+          </div>
+        </div>
+
+        <!-- Tasks that depend on this task -->
+        <div class="dependency-group">
+          <h4>Blocks</h4>
+          <div class="dependency-list" *ngIf="dependentTasks$ | async as dependentTasks">
+            <div *ngIf="dependentTasks.length === 0" class="empty-state">
+              No tasks depend on this
+            </div>
+            <div *ngFor="let depTask of dependentTasks" class="dependency-item">
+              <span class="dependency-task-title" [class.blocked]="task.status !== 'done'">
+                {{ depTask.title }}
+              </span>
+              <span class="dependency-status">
+                {{ TASK_STATUS_LABELS[depTask.status] }}
+              </span>
+            </div>
+          </div>
         </div>
       </div>
     </div>

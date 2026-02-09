@@ -198,13 +198,17 @@ export async function convertProposalToTask(proposalId: string, assigneeIds?: st
     throw new Error('Only approved proposals can be converted to tasks');
   }
   
+  // Get tenantId from proposal (proposals have tenant_id column)
+  const tenantId = (proposal as any).tenant_id || '00000000-0000-0000-0000-000000000000';
+  
   // Create task from proposal
   const { createTask } = await import('./tasks');
   const task = await createTask({
     title: proposal.title,
     description: proposal.description,
     priority: proposal.priority,
-    assigneeIds: assigneeIds || []
+    assigneeIds: assigneeIds || [],
+    tenantId: tenantId
   });
   
   // Create activity linking proposal to task

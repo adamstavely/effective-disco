@@ -1,4 +1,4 @@
-import { Component, Input, Output, EventEmitter, ChangeDetectionStrategy } from '@angular/core';
+import { Component, Input, Output, EventEmitter, ChangeDetectionStrategy, ChangeDetectorRef, OnInit } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { Proposal, ProposalStatus } from '../../models/types';
 import { TimeAgoPipe } from '../../shared/pipes/time-ago.pipe';
@@ -11,11 +11,18 @@ import { TimeAgoPipe } from '../../shared/pipes/time-ago.pipe';
   styleUrl: './proposal-card.component.scss',
   changeDetection: ChangeDetectionStrategy.OnPush
 })
-export class ProposalCardComponent {
+export class ProposalCardComponent implements OnInit {
   @Input() proposal!: Proposal;
   @Output() approve = new EventEmitter<string>();
   @Output() reject = new EventEmitter<string>();
   @Output() convertToTask = new EventEmitter<string>();
+
+  constructor(private cdr: ChangeDetectorRef) {}
+
+  ngOnInit(): void {
+    // Force change detection after input is set
+    this.cdr.markForCheck();
+  }
 
   getStatusClass(): string {
     return `status-${this.proposal.status}`;
@@ -58,5 +65,23 @@ export class ProposalCardComponent {
       high: 'High'
     };
     return labels[priority] || priority;
+  }
+
+  isPending(): boolean {
+    const status = this.proposal?.status;
+    if (!status) {
+      return false;
+    }
+    
+    // Normalize status to lowercase string for comparison
+    const normalizedStatus = String(status).toLowerCase().trim();
+    return normalizedStatus === 'pending';
+  }
+
+  isApproved(): boolean {
+    const status = this.proposal?.status;
+    if (!status) return false;
+    // Normalize status to lowercase string for comparison
+    return String(status).toLowerCase().trim() === 'approved';
   }
 }

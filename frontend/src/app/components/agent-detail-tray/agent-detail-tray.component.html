@@ -2,13 +2,47 @@
   <div class="tray-header">
     <div class="header-content">
       <h2 class="tray-title">Agent Details</h2>
-      <button class="close-btn" (click)="onClose()" aria-label="Close">×</button>
+      <button class="close-btn" (click)="onClose()" aria-label="Close"><lucide-icon name="x" [size]="20"></lucide-icon></button>
     </div>
   </div>
 
+  <!-- Tabs -->
+  <div class="tabs">
+    <button 
+      class="tab-btn" 
+      [class.active]="activeTab === 'overview'"
+      (click)="setTab('overview')"
+    >
+      Overview
+    </button>
+    <button 
+      class="tab-btn" 
+      [class.active]="activeTab === 'performance'"
+      (click)="setTab('performance')"
+    >
+      Performance
+    </button>
+    <button 
+      class="tab-btn" 
+      [class.active]="activeTab === 'workload'"
+      (click)="setTab('workload')"
+    >
+      Workload
+    </button>
+    <button 
+      class="tab-btn" 
+      [class.active]="activeTab === 'memory'"
+      (click)="setTab('memory')"
+    >
+      Memory
+    </button>
+  </div>
+
   <div class="tray-content">
-    <!-- Agent Profile Section -->
-    <section class="profile-section">
+    <!-- Overview Tab -->
+    <ng-container *ngIf="activeTab === 'overview'">
+      <!-- Agent Profile Section -->
+      <section class="profile-section">
       <div class="section-header">
         <h3>Profile</h3>
         <button class="edit-btn" (click)="toggleEditMode()">
@@ -205,5 +239,212 @@
         <div class="empty-state">No activities yet</div>
       </ng-template>
     </section>
+    </ng-container>
+
+    <!-- Performance Tab -->
+    <ng-container *ngIf="activeTab === 'performance'">
+      <section class="performance-section" *ngIf="agentPerformance$ | async as perf; else loadingPerf">
+        <h3>Performance Metrics</h3>
+        
+        <!-- Key Metrics Grid -->
+        <div class="metrics-grid-large">
+          <div class="metric-card-large">
+            <div class="metric-label">Success Rate</div>
+            <div class="metric-value-large">{{ perf.successRate }}%</div>
+            <div class="metric-subtext">
+              {{ perf.completedTasks }} / {{ perf.totalTasks }} tasks completed
+            </div>
+          </div>
+          
+          <div class="metric-card-large">
+            <div class="metric-label">Avg Completion Time</div>
+            <div class="metric-value-large">{{ formatDuration(perf.averageCompletionTime) }}</div>
+            <div class="metric-subtext">Average time to complete tasks</div>
+          </div>
+          
+          <div class="metric-card-large">
+            <div class="metric-label">Cost Per Task</div>
+            <div class="metric-value-large">{{ formatCost(perf.costPerTask) }}</div>
+            <div class="metric-subtext">Average cost per completed task</div>
+          </div>
+          
+          <div class="metric-card-large">
+            <div class="metric-label">Response Time</div>
+            <div class="metric-value-large">{{ formatDuration(perf.responseTime) }}</div>
+            <div class="metric-subtext">Time to first activity</div>
+          </div>
+        </div>
+
+        <!-- Additional Stats -->
+        <div class="stats-grid">
+          <div class="stat-item">
+            <span class="stat-label">Total Tasks:</span>
+            <span class="stat-value">{{ perf.totalTasks }}</span>
+          </div>
+          <div class="stat-item">
+            <span class="stat-label">Completed:</span>
+            <span class="stat-value success">{{ perf.completedTasks }}</span>
+          </div>
+          <div class="stat-item">
+            <span class="stat-label">Failed:</span>
+            <span class="stat-value error">{{ perf.failedTasks }}</span>
+          </div>
+          <div class="stat-item">
+            <span class="stat-label">Total Cost:</span>
+            <span class="stat-value">{{ formatCost(perf.totalCost) }}</span>
+          </div>
+          <div class="stat-item">
+            <span class="stat-label">Tasks (30 days):</span>
+            <span class="stat-value">{{ perf.tasksLast30Days }}</span>
+          </div>
+        </div>
+
+        <!-- Success Rate Trend -->
+        <div class="trend-section">
+          <h4>Success Rate Trend (Last 30 Days)</h4>
+          <div class="trend-chart">
+            <div class="trend-bar" *ngFor="let rate of perf.successRateTrend; let i = index" 
+                 [style.height.%]="rate"
+                 [title]="rate + '%'">
+            </div>
+          </div>
+        </div>
+
+        <!-- Cost Trend -->
+        <div class="trend-section">
+          <h4>Cost Trend (Last 30 Days)</h4>
+          <div class="trend-chart">
+            <div class="trend-bar cost" *ngFor="let cost of perf.costTrend; let i = index"
+                 [style.height.%]="getCostTrendHeight(cost, perf.costTrend)"
+                 [title]="formatCost(cost)">
+            </div>
+          </div>
+        </div>
+      </section>
+      <ng-template #loadingPerf>
+        <div class="loading-state">Loading performance metrics...</div>
+      </ng-template>
+    </ng-container>
+
+    <!-- Workload Tab -->
+    <ng-container *ngIf="activeTab === 'workload'">
+      <section class="workload-section" *ngIf="agentWorkload$ | async as workload; else loadingWorkload">
+        <h3>Current Workload</h3>
+        
+        <!-- Utilization Card -->
+        <div class="utilization-card">
+          <div class="utilization-header">
+            <span class="utilization-label">Capacity Utilization</span>
+            <span class="utilization-value">{{ workload.utilization }}%</span>
+          </div>
+          <div class="utilization-bar">
+            <div class="utilization-fill" 
+                 [style.width.%]="workload.utilization"
+                 [class.warning]="workload.utilization >= 80"
+                 [class.danger]="workload.utilization >= 100">
+            </div>
+          </div>
+          <div class="utilization-info">
+            {{ workload.activeTasks }} / {{ workload.capacity }} active tasks
+          </div>
+        </div>
+
+        <!-- Task Breakdown -->
+        <div class="workload-stats">
+          <div class="workload-stat-card">
+            <div class="workload-stat-value">{{ workload.activeTasks }}</div>
+            <div class="workload-stat-label">Active Tasks</div>
+            <div class="workload-stat-detail">
+              {{ workload.assignedTasks }} assigned, {{ workload.inProgressTasks }} in progress
+            </div>
+          </div>
+          
+          <div class="workload-stat-card">
+            <div class="workload-stat-value">{{ workload.blockedTasks }}</div>
+            <div class="workload-stat-label">Blocked Tasks</div>
+          </div>
+        </div>
+
+        <!-- Capacity Info -->
+        <div class="capacity-info">
+          <h4>Capacity Information</h4>
+          <p>
+            This agent can handle up to <strong>{{ workload.capacity }} concurrent active tasks</strong>.
+            Current utilization is {{ workload.utilization }}%.
+            <span *ngIf="workload.utilization >= 100" class="warning-text">
+              <lucide-icon name="alert-triangle" [size]="16"></lucide-icon> Agent is at full capacity. Consider reassigning tasks.
+            </span>
+            <span *ngIf="workload.utilization >= 80 && workload.utilization < 100" class="warning-text">
+              <lucide-icon name="alert-triangle" [size]="16"></lucide-icon> Agent is approaching capacity.
+            </span>
+          </p>
+        </div>
+      </section>
+      <ng-template #loadingWorkload>
+        <div class="loading-state">Loading workload information...</div>
+      </ng-template>
+    </ng-container>
+
+    <!-- Memory Tab -->
+    <ng-container *ngIf="activeTab === 'memory'">
+      <section class="memory-section">
+        <div class="memory-header">
+          <h3>Agent Memory</h3>
+          <div class="memory-file-selector">
+            <button 
+              class="memory-file-btn"
+              [class.active]="activeMemoryFile === 'WORKING'"
+              (click)="selectMemoryFile('WORKING')"
+            >
+              WORKING.md
+            </button>
+            <button 
+              class="memory-file-btn"
+              [class.active]="activeMemoryFile === 'MEMORY'"
+              (click)="selectMemoryFile('MEMORY')"
+            >
+              MEMORY.md
+            </button>
+            <select 
+              class="daily-notes-select"
+              *ngIf="dailyNotes$ | async as notes"
+              (change)="selectMemoryFile($any($event.target).value)"
+            >
+              <option value="">Daily Notes...</option>
+              <option *ngFor="let note of notes" [value]="note.replace('.md', '')">
+                {{ note }}
+              </option>
+            </select>
+          </div>
+        </div>
+
+        <div class="memory-content" *ngIf="!isLoadingMemory; else loadingMemory">
+          <div class="memory-toolbar" *ngIf="!isEditingMemory">
+            <button class="edit-memory-btn" (click)="startEditingMemory()">Edit</button>
+          </div>
+          
+          <div class="memory-toolbar" *ngIf="isEditingMemory">
+            <button class="save-memory-btn" (click)="saveMemoryFile()">Save</button>
+            <button class="cancel-memory-btn" (click)="cancelEditingMemory()">Cancel</button>
+          </div>
+
+          <div *ngIf="!isEditingMemory" class="memory-display">
+            <pre class="memory-text">{{ memoryContent || '(empty)' }}</pre>
+          </div>
+
+          <textarea 
+            *ngIf="isEditingMemory"
+            class="memory-editor"
+            [(ngModel)]="memoryContent"
+            rows="20"
+            placeholder="Enter memory content..."
+          ></textarea>
+        </div>
+
+        <ng-template #loadingMemory>
+          <div class="loading-state">Loading memory file...</div>
+        </ng-template>
+      </section>
+    </ng-container>
   </div>
 </div>

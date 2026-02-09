@@ -1,16 +1,48 @@
 <div class="mission-queue">
   <div class="header-section">
-    <app-panel-header title="MISSION QUEUE"></app-panel-header>
-    <div class="archive-toggle">
-      <label class="toggle-label">
-        <input 
-          type="checkbox" 
-          [checked]="showArchived" 
-          (change)="toggleArchived()"
-          class="toggle-input"
-        />
-        <span class="toggle-text">Show Archived</span>
-      </label>
+    <div class="header-left">
+      <app-panel-header title="MISSION QUEUE"></app-panel-header>
+      <button class="create-task-btn" (click)="openCreateTaskDialog()" type="button">
+        + Create Task
+      </button>
+    </div>
+    <div class="header-actions">
+      <div class="archive-toggle">
+        <label class="toggle-label">
+          <input 
+            type="checkbox" 
+            [checked]="showArchived" 
+            (change)="toggleArchived()"
+            class="toggle-input"
+          />
+          <span class="toggle-text">Show Archived</span>
+        </label>
+      </div>
+      <button class="bulk-mode-toggle" (click)="toggleBulkMode()" [class.active]="isBulkMode">
+        {{ isBulkMode ? 'Cancel Selection' : 'Select Multiple' }}
+      </button>
+    </div>
+  </div>
+  
+  <!-- Bulk Actions Toolbar -->
+  <div class="bulk-actions-toolbar" *ngIf="isBulkMode && getSelectedCount() > 0">
+    <div class="bulk-info">
+      <span class="selected-count">{{ getSelectedCount() }} selected</span>
+      <button class="btn-link" (click)="deselectAll()">Clear</button>
+    </div>
+    <div class="bulk-buttons">
+      <select class="bulk-status-select" (change)="bulkUpdateStatus($any($event.target).value)" [value]="''">
+        <option value="" disabled>Change Status...</option>
+        <option value="inbox">Inbox</option>
+        <option value="assigned">Assigned</option>
+        <option value="in_progress">In Progress</option>
+        <option value="review">Review</option>
+        <option value="done">Done</option>
+        <option value="blocked">Blocked</option>
+        <option value="archived">Archived</option>
+      </select>
+      <button class="bulk-action-btn" (click)="bulkArchive()">Archive</button>
+      <button class="bulk-action-btn danger" (click)="bulkDelete()">Delete</button>
     </div>
   </div>
   <div class="kanban-board" [class.with-panel]="selectedTask">
@@ -30,11 +62,25 @@
           <span class="task-count">{{ getTaskCount(tasks, status) }}</span>
         </div>
         <div class="tasks-list">
+          <div *ngIf="isBulkMode && tasks[status].length > 0" class="select-all-bar">
+            <label class="select-all-label">
+              <input 
+                type="checkbox" 
+                [checked]="areAllTasksSelectedInColumn(tasks[status])"
+                (change)="toggleSelectAllInColumn(tasks[status])"
+                class="select-all-checkbox"
+              />
+              <span>Select All</span>
+            </label>
+          </div>
           <app-task-card
             *ngFor="let task of tasks[status]"
             [task]="task"
             [selected]="selectedTask?._id === task._id"
-            (click)="selectTask(task)"
+            [isBulkMode]="isBulkMode"
+            [isSelected]="isTaskSelected(task._id)"
+            (click)="isBulkMode ? toggleTaskSelection(task._id) : selectTask(task)"
+            (selectionChange)="toggleTaskSelection(task._id)"
             cdkDrag
           ></app-task-card>
           <div *ngIf="tasks[status]?.length === 0" class="empty-column">
@@ -61,4 +107,81 @@
     [task]="selectedTask"
     (close)="closePanel()"
   ></app-task-detail-panel>
+
+  <!-- Create Task Dialog -->
+  <div *ngIf="showCreateTaskDialog" class="dialog-overlay" (click)="closeCreateTaskDialog()">
+    <div class="dialog" (click)="$event.stopPropagation()">
+      <div class="dialog-header">
+        <h3>Create New Task</h3>
+        <button class="close-btn" (click)="closeCreateTaskDialog()" type="button">×</button>
+      </div>
+      <div class="dialog-content">
+        <div class="form-group">
+          <label for="task-title">Title *</label>
+          <input
+            id="task-title"
+            type="text"
+            [(ngModel)]="newTaskTitle"
+            placeholder="Enter task title"
+            class="form-input"
+            [disabled]="isCreatingTask"
+          />
+        </div>
+        <div class="form-group">
+          <label for="task-description">Description *</label>
+          <textarea
+            id="task-description"
+            [(ngModel)]="newTaskDescription"
+            placeholder="Describe the task"
+            rows="5"
+            class="form-textarea"
+            [disabled]="isCreatingTask"
+          ></textarea>
+        </div>
+        <div class="form-group">
+          <label for="task-priority">Priority</label>
+          <select
+            id="task-priority"
+            [(ngModel)]="newTaskPriority"
+            class="form-select"
+            [disabled]="isCreatingTask"
+          >
+            <option value="low">Low</option>
+            <option value="medium">Medium</option>
+            <option value="high">High</option>
+          </select>
+        </div>
+        <div class="form-group" *ngIf="agents$ | async as agents">
+          <label>Assign to Agents (optional)</label>
+          <div class="agent-checkboxes">
+            <label *ngFor="let agent of agents" class="agent-checkbox">
+              <input
+                type="checkbox"
+                [checked]="isAssigneeSelected(agent._id)"
+                (change)="toggleAssignee(agent._id)"
+                [disabled]="isCreatingTask"
+              />
+              <span>{{ agent.name }}</span>
+            </label>
+          </div>
+          <p *ngIf="selectedAssigneeIds.length > 0" class="selected-count">
+            Selected: {{ selectedAssigneeIds.length }} agent(s)
+          </p>
+        </div>
+      </div>
+      <div class="dialog-actions">
+        <button class="btn-cancel" (click)="closeCreateTaskDialog()" [disabled]="isCreatingTask" type="button">
+          Cancel
+        </button>
+        <button
+          class="btn-primary"
+          (click)="onCreateTask()"
+          [disabled]="!newTaskTitle.trim() || !newTaskDescription.trim() || isCreatingTask"
+          type="button"
+        >
+          {{ isCreatingTask ? 'Creating...' : 'Create Task' }}
+        </button>
+      </div>
+    </div>
+  </div>
 </div>

@@ -36,7 +36,7 @@
     </ul>
   </div>
 
-  <div class="proposal-actions" *ngIf="proposal.status === 'pending'">
+  <div class="proposal-actions" *ngIf="isPending()">
     <button class="action-btn approve-btn" (click)="onApprove()">
       Approve
     </button>
@@ -45,7 +45,7 @@
     </button>
   </div>
 
-  <div class="proposal-actions" *ngIf="proposal.status === 'approved'">
+  <div class="proposal-actions" *ngIf="isApproved()">
     <button class="action-btn convert-btn" (click)="onConvertToTask()">
       Convert to Mission
     </button>

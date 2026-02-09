@@ -3,11 +3,12 @@ import { CommonModule } from '@angular/common';
 import { Document } from '../../models/types';
 import { MarkdownPipe } from '../../shared/pipes/markdown.pipe';
 import { TimeAgoPipe } from '../../shared/pipes/time-ago.pipe';
+import { LucideAngularModule } from 'lucide-angular';
 
 @Component({
   selector: 'app-document-preview-tray',
   standalone: true,
-  imports: [CommonModule, MarkdownPipe, TimeAgoPipe],
+  imports: [CommonModule, MarkdownPipe, TimeAgoPipe, LucideAngularModule],
   templateUrl: './document-preview-tray.component.html',
   styleUrl: './document-preview-tray.component.scss',
   changeDetection: ChangeDetectionStrategy.OnPush

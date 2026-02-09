@@ -1,4 +1,4 @@
-import { Component, Input, Output, EventEmitter, ChangeDetectionStrategy, OnInit, OnDestroy, OnChanges, SimpleChanges } from '@angular/core';
+import { Component, Input, Output, EventEmitter, ChangeDetectionStrategy, OnInit, OnDestroy, OnChanges, SimpleChanges, ChangeDetectorRef } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { Observable, combineLatest, of, BehaviorSubject } from 'rxjs';
@@ -8,6 +8,7 @@ import { Agent, Task, Activity, AgentStatus, AgentLevel } from '../../models/typ
 import { TimeAgoPipe } from '../../shared/pipes/time-ago.pipe';
 import { StatusBadgeComponent } from '../status-badge/status-badge.component';
 import { LevelBadgeComponent } from '../level-badge/level-badge.component';
+import { LucideAngularModule } from 'lucide-angular';
 
 interface AgentStats {
   missions: number;
@@ -24,7 +25,8 @@ interface AgentStats {
     FormsModule,
     TimeAgoPipe,
     StatusBadgeComponent,
-    LevelBadgeComponent
+    LevelBadgeComponent,
+    LucideAngularModule
   ],
   templateUrl: './agent-detail-tray.component.html',
   styleUrl: './agent-detail-tray.component.scss',
@@ -41,11 +43,25 @@ export class AgentDetailTrayComponent implements OnInit, OnDestroy, OnChanges {
   agentStats$: Observable<AgentStats>;
   agentTasks$: Observable<Task[]>;
   agentActivities$: Observable<Activity[]>;
+  agentPerformance$: Observable<any>;
+  agentWorkload$: Observable<any>;
+  dailyNotes$: Observable<string[]>;
+  workingMemory$: Observable<string>;
+  longTermMemory$: Observable<string>;
+
+  activeTab: 'overview' | 'performance' | 'workload' | 'memory' = 'overview';
+  activeMemoryFile: 'WORKING' | 'MEMORY' | string = 'WORKING';
+  memoryContent: string = '';
+  isEditingMemory: boolean = false;
+  isLoadingMemory: boolean = false;
 
   agentStatuses: AgentStatus[] = ['idle', 'active', 'blocked'];
   agentLevels: AgentLevel[] = ['intern', 'specialist', 'lead'];
 
-  constructor(private supabaseService: SupabaseService) {
+  constructor(
+    private supabaseService: SupabaseService,
+    private cdr: ChangeDetectorRef
+  ) {
     // Agent stats observable
     this.agentStats$ = this.agent$.pipe(
       switchMap(agent => 
@@ -73,6 +89,56 @@ export class AgentDetailTrayComponent implements OnInit, OnDestroy, OnChanges {
           startWith([]),
           catchError(() => of([]))
         ) : of([])
+      )
+    );
+
+    // Agent performance metrics observable
+    this.agentPerformance$ = this.agent$.pipe(
+      switchMap(agent =>
+        agent ? this.supabaseService.getAgentPerformanceMetrics(agent._id, 30).pipe(
+          startWith(null),
+          catchError(() => of(null))
+        ) : of(null)
+      )
+    );
+
+    // Agent workload observable
+    this.agentWorkload$ = this.agent$.pipe(
+      switchMap(agent =>
+        agent ? this.supabaseService.getAgentWorkload(agent._id).pipe(
+          startWith(null),
+          catchError(() => of(null))
+        ) : of(null)
+      )
+    );
+
+    // Daily notes observable
+    this.dailyNotes$ = this.agent$.pipe(
+      switchMap(agent =>
+        agent ? this.supabaseService.getAgentDailyNotes(agent._id).pipe(
+          startWith([]),
+          catchError(() => of([]))
+        ) : of([])
+      )
+    );
+
+    // Working memory observable
+    this.workingMemory$ = this.agent$.pipe(
+      switchMap(agent =>
+        agent ? this.supabaseService.getAgentMemoryFile(agent._id, 'WORKING').pipe(
+          startWith(''),
+          catchError(() => of(''))
+        ) : of('')
+      )
+    );
+
+    // Long-term memory observable
+    this.longTermMemory$ = this.agent$.pipe(
+      switchMap(agent =>
+        agent ? this.supabaseService.getAgentMemoryFile(agent._id, 'MEMORY').pipe(
+          startWith(''),
+          catchError(() => of(''))
+        ) : of('')
       )
     );
   }
@@ -140,5 +206,75 @@ export class AgentDetailTrayComponent implements OnInit, OnDestroy, OnChanges {
 
   formatCost(cost: number): string {
     return `$${cost.toFixed(2)}`;
+  }
+
+  formatDuration(ms: number): string {
+    if (ms < 1000) return `${Math.round(ms)}ms`;
+    if (ms < 60000) return `${(ms / 1000).toFixed(1)}s`;
+    if (ms < 3600000) return `${(ms / 60000).toFixed(1)}m`;
+    return `${(ms / 3600000).toFixed(1)}h`;
+  }
+
+  getCostTrendHeight(cost: number, costTrend: number[]): number {
+    if (!costTrend || costTrend.length === 0 || cost <= 0) return 0;
+    const maxCost = Math.max(...costTrend);
+    if (maxCost === 0) return 0;
+    return Math.min((cost / maxCost) * 100, 100);
+  }
+
+  setTab(tab: 'overview' | 'performance' | 'workload' | 'memory') {
+    this.activeTab = tab;
+    if (tab === 'memory' && !this.isEditingMemory) {
+      this.loadMemoryFile();
+    }
+  }
+
+  loadMemoryFile() {
+    if (!this.agent) return;
+    this.isLoadingMemory = true;
+    this.supabaseService.getAgentMemoryFile(this.agent._id, this.activeMemoryFile)
+      .subscribe({
+        next: (content) => {
+          this.memoryContent = content;
+          this.isLoadingMemory = false;
+          this.cdr.markForCheck();
+        },
+        error: () => {
+          this.memoryContent = '';
+          this.isLoadingMemory = false;
+          this.cdr.markForCheck();
+        }
+      });
+  }
+
+  selectMemoryFile(fileType: 'WORKING' | 'MEMORY' | string) {
+    this.activeMemoryFile = fileType;
+    this.loadMemoryFile();
+  }
+
+  startEditingMemory() {
+    this.isEditingMemory = true;
+  }
+
+  cancelEditingMemory() {
+    this.isEditingMemory = false;
+    this.loadMemoryFile(); // Reload original content
+  }
+
+  saveMemoryFile() {
+    if (!this.agent) return;
+    this.isLoadingMemory = true;
+    this.supabaseService.updateAgentMemoryFile(this.agent._id, this.activeMemoryFile, this.memoryContent)
+      .then(() => {
+        this.isEditingMemory = false;
+        this.isLoadingMemory = false;
+        this.cdr.markForCheck();
+      })
+      .catch(error => {
+        console.error('Error saving memory file:', error);
+        alert('Failed to save memory file');
+        this.isLoadingMemory = false;
+        this.cdr.markForCheck();
+      });
   }
 }

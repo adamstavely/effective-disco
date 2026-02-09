@@ -1,15 +1,16 @@
 import { Component, Input, Output, EventEmitter, ChangeDetectionStrategy } from '@angular/core';
-import { CommonModule } from '@angular/common';
+import { CommonModule, TitleCasePipe } from '@angular/common';
 import { DragDropModule } from '@angular/cdk/drag-drop';
 import { Task } from '../../models/types';
 import { TagComponent } from '../tag/tag.component';
 import { TimeAgoPipe } from '../../shared/pipes/time-ago.pipe';
 import { SupabaseService } from '../../services/supabase.service';
+import { LucideAngularModule } from 'lucide-angular';
 
 @Component({
   selector: 'app-task-card',
   standalone: true,
-  imports: [CommonModule, DragDropModule, TagComponent, TimeAgoPipe],
+  imports: [CommonModule, DragDropModule, TagComponent, TimeAgoPipe, TitleCasePipe, LucideAngularModule],
   templateUrl: './task-card.component.html',
   styleUrl: './task-card.component.scss',
   changeDetection: ChangeDetectionStrategy.OnPush
@@ -17,8 +18,11 @@ import { SupabaseService } from '../../services/supabase.service';
 export class TaskCardComponent {
   @Input() task!: Task;
   @Input() selected: boolean = false;
+  @Input() isBulkMode: boolean = false;
+  @Input() isSelected: boolean = false;
   @Output() play = new EventEmitter<Task>();
   @Output() archive = new EventEmitter<Task>();
+  @Output() selectionChange = new EventEmitter<void>();
 
   readonly MAX_VISIBLE_TAGS = 2;
 

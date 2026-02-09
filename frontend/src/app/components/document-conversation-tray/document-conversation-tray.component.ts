@@ -6,11 +6,12 @@ import { MarkdownPipe } from '../../shared/pipes/markdown.pipe';
 import { TimeAgoPipe } from '../../shared/pipes/time-ago.pipe';
 import { Observable, combineLatest, of, BehaviorSubject } from 'rxjs';
 import { map, switchMap, catchError } from 'rxjs/operators';
+import { LucideAngularModule } from 'lucide-angular';
 
 @Component({
   selector: 'app-document-conversation-tray',
   standalone: true,
-  imports: [CommonModule, MarkdownPipe, TimeAgoPipe],
+  imports: [CommonModule, MarkdownPipe, TimeAgoPipe, LucideAngularModule],
   templateUrl: './document-conversation-tray.component.html',
   styleUrl: './document-conversation-tray.component.scss',
   changeDetection: ChangeDetectionStrategy.OnPush

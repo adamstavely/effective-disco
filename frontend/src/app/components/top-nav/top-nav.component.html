@@ -15,7 +15,8 @@
   <div class="nav-right">
     <app-tenant-selector></app-tenant-selector>
     <button class="chat-btn" (click)="onChatClick()" type="button" title="Open Chat">
-      💬 Chat
+      <lucide-icon name="message-circle" [size]="16"></lucide-icon>
+      Chat
     </button>
     <button class="docs-btn">Docs</button>
     <div class="timestamp" *ngIf="currentTime$ | async as currentTime">

@@ -56,6 +56,9 @@ export interface Message {
   attachments: string[];
   createdAt: number;
   mentions: string[];
+  editedAt?: number | null;
+  deletedAt?: number | null;
+  originalContent?: string | null;
 }
 
 export interface ChatThread {
@@ -63,7 +66,8 @@ export interface ChatThread {
   _creationTime: number;
   title: string | null;
   createdBy: string; // kept for backward compatibility, but agentId is the primary field
-  agentId: string; // the agent the user is chatting with
+  agentId: string | null; // the agent the user is chatting with (null for agent-to-agent threads)
+  participantAgentIds: string[] | null; // array of agent IDs for agent-to-agent threads (null for user-to-agent threads)
   createdAt: number;
   updatedAt: number;
 }
@@ -124,4 +128,12 @@ export interface Tenant {
   slug: string;
   createdAt: string;
   updatedAt: string;
+}
+
+export interface TaskDependency {
+  _id: string;
+  _creationTime: number;
+  taskId: string;
+  dependsOnTaskId: string;
+  createdAt: number;
 }

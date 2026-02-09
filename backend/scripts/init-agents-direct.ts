@@ -127,10 +127,17 @@ async function initializeAgentsDirect() {
         continue;
       }
 
-      // Insert agent
+      // Ensure default tenant exists
+      await client.query(`
+        INSERT INTO tenants (id, name, slug, created_at, updated_at)
+        VALUES ('00000000-0000-0000-0000-000000000000', 'Default Tenant', 'default', NOW(), NOW())
+        ON CONFLICT (id) DO NOTHING
+      `);
+
+      // Insert agent with tenant_id
       const result = await client.query(
-        `INSERT INTO agents (name, role, session_key, level, status, last_heartbeat)
-         VALUES ($1, $2, $3, $4, $5, $6)
+        `INSERT INTO agents (name, role, session_key, level, status, last_heartbeat, tenant_id)
+         VALUES ($1, $2, $3, $4, $5, $6, '00000000-0000-0000-0000-000000000000')
          RETURNING id`,
         [agentData.name, agentData.role, agentData.sessionKey, agentData.level, 'idle', Date.now()]
       );

@@ -2,7 +2,7 @@ import { Injectable } from '@angular/core';
 import { createClient, SupabaseClient, RealtimeChannel } from '@supabase/supabase-js';
 import { Observable, from, BehaviorSubject, combineLatest } from 'rxjs';
 import { map, startWith, catchError, switchMap } from 'rxjs/operators';
-import { Agent, Task, Message, Activity, Document, Notification, Proposal, ProposedStep, ChatThread, Tenant } from '../models/types';
+import { Agent, Task, Message, Activity, Document, Notification, Proposal, ProposedStep, ChatThread, Tenant, ProposalStatus } from '../models/types';
 import { TenantContextService } from './tenant-context.service';
 
 @Injectable({
@@ -255,6 +255,161 @@ export class SupabaseService {
       });
   }
 
+  deleteTask(id: string): Promise<void> {
+    if (!this.client) return Promise.reject(new Error('Supabase client not initialized'));
+    
+    const tenantId = this.getTenantId();
+    
+    return Promise.resolve(this.client.from('tasks')
+      .delete()
+      .eq('id', id)
+      .eq('tenant_id', tenantId))
+      .then(({ error }) => {
+        if (error) throw error;
+      });
+  }
+
+  updateTaskAssignments(taskId: string, agentIds: string[]): Promise<void> {
+    if (!this.client) return Promise.reject(new Error('Supabase client not initialized'));
+    
+    const tenantId = this.getTenantId();
+    
+    return Promise.resolve(
+      // First, delete existing assignments
+      this.client.from('task_assignments')
+        .delete()
+        .eq('task_id', taskId)
+        .eq('tenant_id', tenantId)
+    ).then(() => {
+      // Then, create new assignments
+      if (agentIds.length > 0) {
+        const assignments = agentIds.map(agentId => ({
+          task_id: taskId,
+          agent_id: agentId,
+          tenant_id: tenantId
+        }));
+        
+        return Promise.resolve(this.client!.from('task_assignments')
+          .insert(assignments))
+          .then(({ error }) => {
+            if (error) throw error;
+          });
+      }
+      // Return void promise when no agents to assign
+      return Promise.resolve();
+    });
+  }
+
+  // Task Dependencies
+  getTaskDependencies(taskId: string): Observable<import('../models/types').TaskDependency[]> {
+    if (!this.client) return new BehaviorSubject<import('../models/types').TaskDependency[]>([]).asObservable();
+    
+    const tenantId = this.getTenantId();
+    
+    return from(
+      Promise.resolve(this.client.from('task_dependencies')
+        .select('*')
+        .eq('task_id', taskId)
+        .eq('tenant_id', tenantId))
+        .then(({ data, error }) => {
+          if (error) {
+            console.error('Error fetching task dependencies:', error);
+            return [];
+          }
+          return (data || []).map((dep: any) => ({
+            _id: dep.id,
+            _creationTime: new Date(dep.created_at).getTime(),
+            taskId: dep.task_id,
+            dependsOnTaskId: dep.depends_on_task_id,
+            createdAt: new Date(dep.created_at).getTime()
+          }));
+        })
+    );
+  }
+
+  getDependentTasks(taskId: string): Observable<Task[]> {
+    if (!this.client) return new BehaviorSubject<Task[]>([]).asObservable();
+    
+    const tenantId = this.getTenantId();
+    
+    return from(
+      Promise.resolve(this.client.from('task_dependencies')
+        .select(`
+          task_id,
+          tasks!task_dependencies_task_id_fkey (
+            *,
+            task_assignments (agent_id)
+          )
+        `)
+        .eq('depends_on_task_id', taskId)
+        .eq('tenant_id', tenantId))
+        .then(({ data, error }) => {
+          if (error) {
+            console.error('Error fetching dependent tasks:', error);
+            return [];
+          }
+          return (data || []).map((item: any) => this.transformTask(item.tasks));
+        })
+    );
+  }
+
+  getTasksThisDependsOn(taskId: string): Observable<Task[]> {
+    if (!this.client) return new BehaviorSubject<Task[]>([]).asObservable();
+    
+    const tenantId = this.getTenantId();
+    
+    return from(
+      Promise.resolve(this.client.from('task_dependencies')
+        .select(`
+          depends_on_task_id,
+          tasks!task_dependencies_depends_on_task_id_fkey (
+            *,
+            task_assignments (agent_id)
+          )
+        `)
+        .eq('task_id', taskId)
+        .eq('tenant_id', tenantId))
+        .then(({ data, error }) => {
+          if (error) {
+            console.error('Error fetching tasks this depends on:', error);
+            return [];
+          }
+          return (data || []).map((item: any) => this.transformTask(item.tasks));
+        })
+    );
+  }
+
+  addTaskDependency(taskId: string, dependsOnTaskId: string): Promise<void> {
+    if (!this.client) return Promise.reject(new Error('Supabase client not initialized'));
+    
+    const tenantId = this.getTenantId();
+    
+    return Promise.resolve(this.client.from('task_dependencies')
+      .insert({
+        task_id: taskId,
+        depends_on_task_id: dependsOnTaskId,
+        tenant_id: tenantId
+      }))
+      .then(({ error }) => {
+        if (error) throw error;
+      });
+  }
+
+  removeTaskDependency(taskId: string, dependsOnTaskId: string): Promise<void> {
+    if (!this.client) return Promise.reject(new Error('Supabase client not initialized'));
+    
+    const tenantId = this.getTenantId();
+    
+    return Promise.resolve(this.client.from('task_dependencies')
+      .delete()
+      .eq('task_id', taskId)
+      .eq('depends_on_task_id', dependsOnTaskId)
+      .eq('tenant_id', tenantId))
+      .then(({ error }) => {
+        if (error) throw error;
+      });
+  }
+
   // Messages
   getMessages(taskId: string): Observable<Message[]> {
     if (!this.client) return new BehaviorSubject<Message[]>([]).asObservable();
@@ -320,7 +475,7 @@ export class SupabaseService {
     });
   }
 
-  createMessage(taskId: string, fromAgentId: string, content: string, mentions?: string[]): Promise<string> {
+  createMessage(taskId: string, fromAgentId: string | null, content: string, mentions?: string[]): Promise<string> {
     if (!this.client) return Promise.reject(new Error('Supabase client not initialized'));
     
     const tenantId = this.getTenantId();
@@ -706,6 +861,388 @@ export class SupabaseService {
         .then(({ data, error }) => {
           if (error) throw error;
           return this.transformActivities(data || []);
+        })
+    );
+  }
+
+  // Agent Performance Analytics
+  getAgentPerformanceMetrics(agentId: string, days: number = 30): Observable<{
+    agentId: string;
+    agentName: string;
+    successRate: number;
+    averageCompletionTime: number;
+    costPerTask: number;
+    responseTime: number;
+    totalTasks: number;
+    completedTasks: number;
+    failedTasks: number;
+    totalCost: number;
+    tasksLast30Days: number;
+    successRateTrend: number[];
+    costTrend: number[];
+  }> {
+    if (!this.client) {
+      return new BehaviorSubject({
+        agentId: '',
+        agentName: '',
+        successRate: 0,
+        averageCompletionTime: 0,
+        costPerTask: 0,
+        responseTime: 0,
+        totalTasks: 0,
+        completedTasks: 0,
+        failedTasks: 0,
+        totalCost: 0,
+        tasksLast30Days: 0,
+        successRateTrend: [],
+        costTrend: []
+      }).asObservable();
+    }
+    
+    const tenantId = this.getTenantId();
+    const daysAgo = new Date();
+    daysAgo.setDate(daysAgo.getDate() - days);
+    const daysAgoTimestamp = daysAgo.getTime();
+    
+    return from(
+      Promise.all([
+        // Get agent info
+        Promise.resolve(this.client.from('agents')
+          .select('id, name')
+          .eq('id', agentId)
+          .eq('tenant_id', tenantId)
+          .single())
+          .then(({ data, error }) => {
+            if (error) throw error;
+            return data;
+          }),
+        
+        // Get all task assignments
+        Promise.resolve(this.client.from('task_assignments')
+          .select(`
+            task_id,
+            tasks (
+              id,
+              status,
+              created_at,
+              updated_at,
+              started_at
+            )
+          `)
+          .eq('agent_id', agentId)
+          .eq('tenant_id', tenantId))
+          .then(({ data, error }) => {
+            if (error) throw error;
+            return (data || []).map((ta: any) => ta.tasks).filter(Boolean);
+          }),
+        
+        // Get costs
+        Promise.resolve(this.client.from('costs')
+          .select('amount, created_at')
+          .eq('agent_id', agentId)
+          .eq('tenant_id', tenantId))
+          .then(({ data, error }) => {
+            if (error) return [];
+            return data || [];
+          })
+          .catch(() => []),
+        
+        // Get activities for response time
+        Promise.resolve(this.client.from('activities')
+          .select('created_at, task_id')
+          .eq('agent_id', agentId)
+          .eq('tenant_id', tenantId)
+          .order('created_at', { ascending: true }))
+          .then(({ data, error }) => {
+            if (error) return [];
+            return data || [];
+          })
+          .catch(() => [])
+      ]).then(([agent, tasks, costs, activities]) => {
+        const completedTasks = tasks.filter((t: any) => t.status === 'done');
+        const failedTasks = tasks.filter((t: any) => t.status === 'blocked');
+        const recentTasks = tasks.filter((t: any) => t.created_at >= daysAgoTimestamp);
+        
+        // Calculate success rate
+        const successRate = tasks.length > 0 
+          ? Math.round((completedTasks.length / tasks.length) * 100) 
+          : 0;
+        
+        // Calculate average completion time
+        let averageCompletionTime = 0;
+        if (completedTasks.length > 0) {
+          const completionTimes = completedTasks
+            .filter((t: any) => t.started_at && t.updated_at)
+            .map((t: any) => t.updated_at - t.started_at);
+          if (completionTimes.length > 0) {
+            averageCompletionTime = completionTimes.reduce((a: number, b: number) => a + b, 0) / completionTimes.length;
+          }
+        }
+        
+        // Calculate cost metrics
+        const totalCost = costs.reduce((sum: number, cost: any) => 
+          sum + (parseFloat(cost.amount) || 0), 0
+        );
+        const costPerTask = completedTasks.length > 0 ? totalCost / completedTasks.length : 0;
+        
+        // Calculate response time
+        let responseTime = 0;
+        const taskFirstActivity = new Map<string, number>();
+        activities.forEach((a: any) => {
+          if (a.task_id && !taskFirstActivity.has(a.task_id)) {
+            taskFirstActivity.set(a.task_id, a.created_at);
+          }
+        });
+        
+        const responseTimes: number[] = [];
+        tasks.forEach((t: any) => {
+          const firstActivity = taskFirstActivity.get(t.id);
+          if (firstActivity && t.created_at) {
+            responseTimes.push(firstActivity - t.created_at);
+          }
+        });
+        
+        if (responseTimes.length > 0) {
+          responseTime = responseTimes.reduce((a, b) => a + b, 0) / responseTimes.length;
+        }
+        
+        // Calculate trends
+        const successRateTrend: number[] = [];
+        const costTrend: number[] = [];
+        
+        for (let i = days - 1; i >= 0; i--) {
+          const dayStart = new Date();
+          dayStart.setDate(dayStart.getDate() - i);
+          dayStart.setHours(0, 0, 0, 0);
+          const dayStartTimestamp = dayStart.getTime();
+          
+          const dayEnd = new Date(dayStart);
+          dayEnd.setHours(23, 59, 59, 999);
+          const dayEndTimestamp = dayEnd.getTime();
+          
+          const dayTasks = tasks.filter((t: any) => 
+            t.created_at >= dayStartTimestamp && t.created_at <= dayEndTimestamp
+          );
+          const dayCompleted = dayTasks.filter((t: any) => t.status === 'done').length;
+          const daySuccessRate = dayTasks.length > 0 ? (dayCompleted / dayTasks.length) * 100 : 0;
+          successRateTrend.push(Math.round(daySuccessRate));
+          
+          const dayCost = costs
+            .filter((c: any) => c.created_at >= dayStartTimestamp && c.created_at <= dayEndTimestamp)
+            .reduce((sum: number, cost: any) => sum + (parseFloat(cost.amount) || 0), 0);
+          costTrend.push(dayCost);
+        }
+        
+        return {
+          agentId: agent.id,
+          agentName: agent.name,
+          successRate,
+          averageCompletionTime,
+          costPerTask,
+          responseTime,
+          totalTasks: tasks.length,
+          completedTasks: completedTasks.length,
+          failedTasks: failedTasks.length,
+          totalCost,
+          tasksLast30Days: recentTasks.length,
+          successRateTrend,
+          costTrend
+        };
+      })
+    );
+  }
+
+  // Agent Workload
+  getAgentWorkload(agentId: string): Observable<{
+    agentId: string;
+    agentName: string;
+    activeTasks: number;
+    assignedTasks: number;
+    inProgressTasks: number;
+    blockedTasks: number;
+    capacity: number;
+    utilization: number;
+  }> {
+    if (!this.client) {
+      return new BehaviorSubject({
+        agentId: '',
+        agentName: '',
+        activeTasks: 0,
+        assignedTasks: 0,
+        inProgressTasks: 0,
+        blockedTasks: 0,
+        capacity: 5,
+        utilization: 0
+      }).asObservable();
+    }
+    
+    const tenantId = this.getTenantId();
+    
+    return from(
+      Promise.all([
+        Promise.resolve(this.client.from('agents')
+          .select('id, name')
+          .eq('id', agentId)
+          .eq('tenant_id', tenantId)
+          .single())
+          .then(({ data, error }) => {
+            if (error) throw error;
+            return data;
+          }),
+        
+        Promise.resolve(this.client.from('task_assignments')
+          .select(`
+            task_id,
+            tasks (
+              id,
+              status
+            )
+          `)
+          .eq('agent_id', agentId)
+          .eq('tenant_id', tenantId))
+          .then(({ data, error }) => {
+            if (error) throw error;
+            return (data || []).map((a: any) => a.tasks).filter(Boolean);
+          })
+      ]).then(([agent, tasks]) => {
+        const activeTasks = tasks.filter((t: any) => 
+          t.status === 'assigned' || t.status === 'in_progress'
+        ).length;
+        const assignedTasks = tasks.filter((t: any) => t.status === 'assigned').length;
+        const inProgressTasks = tasks.filter((t: any) => t.status === 'in_progress').length;
+        const blockedTasks = tasks.filter((t: any) => t.status === 'blocked').length;
+        
+        const capacity = 5; // Default capacity
+        const utilization = capacity > 0 ? Math.round((activeTasks / capacity) * 100) : 0;
+        
+        return {
+          agentId: agent.id,
+          agentName: agent.name,
+          activeTasks,
+          assignedTasks,
+          inProgressTasks,
+          blockedTasks,
+          capacity,
+          utilization
+        };
+      })
+    );
+  }
+
+  getAllAgentsWorkload(): Observable<Array<{
+    agentId: string;
+    agentName: string;
+    activeTasks: number;
+    assignedTasks: number;
+    inProgressTasks: number;
+    blockedTasks: number;
+    capacity: number;
+    utilization: number;
+  }>> {
+    if (!this.client) return new BehaviorSubject([]).asObservable();
+    
+    const tenantId = this.getTenantId();
+    
+    return from(
+      Promise.resolve(this.client.from('agents')
+        .select('id, name')
+        .eq('tenant_id', tenantId))
+        .then(({ data: agents, error }) => {
+          if (error) throw error;
+          
+          return Promise.all(
+            (agents || []).map(agent => 
+              this.getAgentWorkload(agent.id).pipe(
+                map(workload => workload)
+              ).toPromise()
+            )
+          );
+        })
+        .then(workloads => workloads.filter(Boolean) as any[])
+    );
+  }
+
+  // Automated Task Assignment
+  suggestTaskAssignment(taskId: string, rules: Array<{type: string; priority: number}> = []): Observable<string[]> {
+    if (!this.client) return new BehaviorSubject<string[]>([]).asObservable();
+    
+    const tenantId = this.getTenantId();
+    
+    // Default rules if none provided
+    if (rules.length === 0) {
+      rules = [
+        { type: 'workload', priority: 1 },
+        { type: 'role', priority: 2 },
+        { type: 'round_robin', priority: 3 }
+      ];
+    }
+    
+    rules.sort((a, b) => a.priority - b.priority);
+    
+    return from(
+      Promise.resolve(this.client.from('agents')
+        .select('id, name, role, status, level')
+        .eq('tenant_id', tenantId))
+        .then(async ({ data: agents, error }) => {
+          if (error) throw error;
+          
+          // Filter to idle/active agents
+          let candidates = (agents || []).filter((a: any) => 
+            a.status === 'idle' || a.status === 'active'
+          );
+          
+          // Apply workload rule first
+          if (rules.some(r => r.type === 'workload')) {
+            const workloads = await Promise.all(
+              candidates.map((a: any) => 
+                this.getAgentWorkload(a.id).pipe(
+                  map(w => w)
+                ).toPromise()
+              )
+            );
+            
+            workloads.sort((a: any, b: any) => 
+              (a?.utilization || 0) - (b?.utilization || 0)
+            );
+            const minUtilization = workloads[0]?.utilization || 0;
+            candidates = candidates.filter((_, i) => 
+              workloads[i]?.utilization === minUtilization
+            );
+          }
+          
+          // Round-robin: select agent with least recent assignment
+          if (candidates.length > 1 && rules.some(r => r.type === 'round_robin')) {
+            const { data: recentAssignments } = await this.client!.from('task_assignments')
+              .select('agent_id, created_at')
+              .in('agent_id', candidates.map((a: any) => a.id))
+              .eq('tenant_id', tenantId)
+              .order('created_at', { ascending: false });
+            
+            if (recentAssignments && recentAssignments.length > 0) {
+              const agentLastAssignment = new Map<string, number>();
+              recentAssignments.forEach((a: any) => {
+                if (!agentLastAssignment.has(a.agent_id) || 
+                    agentLastAssignment.get(a.agent_id)! < a.created_at) {
+                  agentLastAssignment.set(a.agent_id, a.created_at);
+                }
+              });
+              
+              let oldestAgent = candidates[0].id;
+              let oldestTime = agentLastAssignment.get(oldestAgent) || 0;
+              
+              candidates.forEach((c: any) => {
+                const time = agentLastAssignment.get(c.id) || 0;
+                if (time < oldestTime) {
+                  oldestTime = time;
+                  oldestAgent = c.id;
+                }
+              });
+              
+              candidates = candidates.filter((c: any) => c.id === oldestAgent);
+            }
+          }
+          
+          return candidates.slice(0, 1).map((a: any) => a.id);
         })
     );
   }
@@ -1242,12 +1779,14 @@ export class SupabaseService {
   getChatThreads(): Observable<ChatThread[]> {
     if (!this.client) return new BehaviorSubject<ChatThread[]>([]).asObservable();
     
-    const channel = this.getChannel('chat-threads');
+    const tenantId = this.getTenantId();
+    const channel = this.getChannel(`chat-threads-${tenantId}`);
     
     return new Observable(observer => {
       // Initial fetch
       Promise.resolve(this.client!.from('chat_threads')
         .select('*')
+        .eq('tenant_id', tenantId)
         .order('updated_at', { ascending: false }))
         .then(({ data, error }) => {
           if (error) {
@@ -1262,13 +1801,19 @@ export class SupabaseService {
           observer.next([]);
         });
       
-      // Subscribe to changes
+      // Subscribe to changes (filtered by tenant_id)
       const subscription = channel
         .on('postgres_changes',
-          { event: '*', schema: 'public', table: 'chat_threads' },
+          { 
+            event: '*', 
+            schema: 'public', 
+            table: 'chat_threads',
+            filter: `tenant_id=eq.${tenantId}`
+          },
           () => {
             Promise.resolve(this.client!.from('chat_threads')
               .select('*')
+              .eq('tenant_id', tenantId)
               .order('updated_at', { ascending: false }))
               .then(({ data, error }) => {
                 if (error) {
@@ -1293,10 +1838,11 @@ export class SupabaseService {
   getChatMessages(chatThreadId: string): Observable<Message[]> {
     if (!this.client) return new BehaviorSubject<Message[]>([]).asObservable();
     
+    const tenantId = this.getTenantId();
     const channel = this.getChannel(`chat-messages-${chatThreadId}`);
     
     return new Observable(observer => {
-      // Initial fetch
+      // Initial fetch - filter out deleted messages
       Promise.resolve(this.client!.from('messages')
         .select(`
           *,
@@ -1304,6 +1850,8 @@ export class SupabaseService {
           message_mentions (agent_id)
         `)
         .eq('chat_thread_id', chatThreadId)
+        .eq('tenant_id', tenantId)
+        .is('deleted_at', null) // Only get non-deleted messages
         .order('created_at', { ascending: true }))
         .then(({ data, error }) => {
           if (error) {
@@ -1318,10 +1866,15 @@ export class SupabaseService {
           observer.next([]);
         });
       
-      // Subscribe to changes
+      // Subscribe to changes (filtered by tenant_id)
       const subscription = channel
         .on('postgres_changes',
-          { event: 'INSERT', schema: 'public', table: 'messages', filter: `chat_thread_id=eq.${chatThreadId}` },
+          { 
+            event: '*', // Listen to INSERT, UPDATE, DELETE
+            schema: 'public', 
+            table: 'messages', 
+            filter: `chat_thread_id=eq.${chatThreadId}`
+          },
           () => {
             Promise.resolve(this.client!.from('messages')
               .select(`
@@ -1330,6 +1883,8 @@ export class SupabaseService {
                 message_mentions (agent_id)
               `)
               .eq('chat_thread_id', chatThreadId)
+              .eq('tenant_id', tenantId)
+              .is('deleted_at', null) // Only get non-deleted messages
               .order('created_at', { ascending: true }))
               .then(({ data, error }) => {
                 if (error) {
@@ -1354,6 +1909,9 @@ export class SupabaseService {
   createChatThread(agentId: string, title?: string): Promise<string> {
     if (!this.client) return Promise.reject(new Error('Supabase client not initialized'));
     
+    const tenantId = this.getTenantId();
+    const now = Date.now();
+    
     // For backward compatibility, we'll use the first agent as created_by
     // but agent_id is the primary field for user-to-agent chat
     return Promise.resolve(this.client.from('chat_threads')
@@ -1361,12 +1919,54 @@ export class SupabaseService {
         agent_id: agentId,
         created_by: agentId, // kept for backward compatibility
         title: title || null,
-        created_at: Date.now(),
-        updated_at: Date.now()
+        created_at: now,
+        updated_at: now,
+        tenant_id: tenantId // Include tenant_id for multi-tenant support
       })
       .select('id')
-      .single()).then(({ data, error }) => {
-        if (error) throw error;
+      .single())
+      .then(({ data, error }) => {
+        if (error) {
+          console.error('Error creating chat thread:', error);
+          throw error;
+        }
+        if (!data) {
+          throw new Error('Chat thread creation failed: no data returned');
+        }
+        return data.id;
+      });
+  }
+
+  createAgentToAgentThread(participantAgentIds: string[], title?: string): Promise<string> {
+    if (!this.client) return Promise.reject(new Error('Supabase client not initialized'));
+    
+    if (participantAgentIds.length < 2) {
+      return Promise.reject(new Error('Agent-to-agent threads require at least 2 participants'));
+    }
+    
+    const tenantId = this.getTenantId();
+    const now = Date.now();
+    
+    return Promise.resolve(this.client.from('chat_threads')
+      .insert({
+        participant_agent_ids: participantAgentIds,
+        agent_id: null, // NULL for agent-to-agent threads
+        created_by: participantAgentIds[0], // Use first participant as creator
+        tenant_id: tenantId,
+        title: title || null,
+        created_at: now,
+        updated_at: now
+      })
+      .select('id')
+      .single())
+      .then(({ data, error }) => {
+        if (error) {
+          console.error('Error creating agent-to-agent thread:', error);
+          throw error;
+        }
+        if (!data) {
+          throw new Error('Agent-to-agent thread creation failed: no data returned');
+        }
         return data.id;
       });
   }
@@ -1377,13 +1977,78 @@ export class SupabaseService {
     // fromAgentId is optional: null/undefined = user message, UUID = agent message
     return Promise.resolve(this.client.rpc('create_chat_message', {
       p_chat_thread_id: chatThreadId,
-      p_from_agent_id: fromAgentId || null,
       p_content: content,
-      p_mentions: mentions || []
+      p_from_agent_id: fromAgentId || null,
+      p_mentions: mentions || [],
+      p_attachments: [] // Empty array for now, can be extended later
     })).then(({ data, error }) => {
-      if (error) throw error;
+      if (error) {
+        console.error('Error creating chat message:', error);
+        throw new Error(error.message || 'Failed to create chat message');
+      }
+      if (!data) {
+        throw new Error('Chat message creation failed: no data returned');
+      }
       return data as string;
     });
+  }
+
+  updateChatMessage(messageId: string, newContent: string): Promise<string> {
+    if (!this.client) return Promise.reject(new Error('Supabase client not initialized'));
+    
+    const tenantId = this.getTenantId();
+    
+    return Promise.resolve(this.client.rpc('update_chat_message', {
+      p_message_id: messageId,
+      p_new_content: newContent,
+      p_tenant_id: tenantId
+    })).then(({ data, error }) => {
+      if (error) {
+        console.error('Error updating chat message:', error);
+        throw new Error(error.message || 'Failed to update chat message');
+      }
+      if (!data) {
+        throw new Error('Chat message update failed: no data returned');
+      }
+      return data as string;
+    });
+  }
+
+  deleteChatMessage(messageId: string): Promise<string> {
+    if (!this.client) return Promise.reject(new Error('Supabase client not initialized'));
+    
+    const tenantId = this.getTenantId();
+    
+    return Promise.resolve(this.client.rpc('delete_chat_message', {
+      p_message_id: messageId,
+      p_tenant_id: tenantId
+    })).then(({ data, error }) => {
+      if (error) {
+        console.error('Error deleting chat message:', error);
+        throw new Error(error.message || 'Failed to delete chat message');
+      }
+      if (!data) {
+        throw new Error('Chat message deletion failed: no data returned');
+      }
+      return data as string;
+    });
+  }
+
+  updateChatThreadTitle(threadId: string, title: string): Promise<void> {
+    if (!this.client) return Promise.reject(new Error('Supabase client not initialized'));
+    
+    const tenantId = this.getTenantId();
+    
+    return Promise.resolve(this.client.from('chat_threads')
+      .update({ title, updated_at: Date.now() })
+      .eq('id', threadId)
+      .eq('tenant_id', tenantId))
+      .then(({ error }) => {
+        if (error) {
+          console.error('Error updating chat thread title:', error);
+          throw new Error(error.message || 'Failed to update thread title');
+        }
+      });
   }
 
   // Tenants
@@ -1473,7 +2138,10 @@ export class SupabaseService {
       content: msg.content,
       attachments: msg.message_attachments?.map((a: any) => a.document_id) || [],
       createdAt: msg.created_at,
-      mentions: msg.message_mentions?.map((m: any) => m.agent_id) || []
+      mentions: msg.message_mentions?.map((m: any) => m.agent_id) || [],
+      editedAt: msg.edited_at || null,
+      deletedAt: msg.deleted_at || null,
+      originalContent: msg.original_content || null
     }));
   }
 
@@ -1526,7 +2194,7 @@ export class SupabaseService {
       description: proposal.description,
       source: proposal.source,
       priority: proposal.priority,
-      status: proposal.status,
+      status: (proposal.status || 'pending').toLowerCase() as ProposalStatus, // Normalize status
       proposedSteps: proposal.proposed_steps || [],
       createdAt: proposal.created_at,
       updatedAt: proposal.updated_at,
@@ -1543,7 +2211,7 @@ export class SupabaseService {
       description: proposal.description,
       source: proposal.source,
       priority: proposal.priority,
-      status: proposal.status,
+      status: (proposal.status || 'pending').toLowerCase() as ProposalStatus, // Normalize status
       proposedSteps: proposal.proposed_steps || [],
       createdAt: proposal.created_at,
       updatedAt: proposal.updated_at,
@@ -1558,7 +2226,8 @@ export class SupabaseService {
       _creationTime: thread.created_at,
       title: thread.title,
       createdBy: thread.created_by || thread.agent_id, // fallback for backward compatibility
-      agentId: thread.agent_id || thread.created_by, // primary field
+      agentId: thread.agent_id, // null for agent-to-agent threads
+      participantAgentIds: thread.participant_agent_ids, // array for agent-to-agent threads
       createdAt: thread.created_at,
       updatedAt: thread.updated_at
     }));
@@ -1575,5 +2244,44 @@ export class SupabaseService {
     }
     
     return this.channels.get(name)!;
+  }
+
+  // Agent Memory Management
+  private getMemoryApiUrl(): string {
+    return (window as any).MEMORY_API_URL || 'http://localhost:3002';
+  }
+
+  getAgentMemoryFile(agentId: string, fileType: 'WORKING' | 'MEMORY' | string): Observable<string> {
+    const url = `${this.getMemoryApiUrl()}/api/agents/${agentId}/memory/${fileType}`;
+    return from(
+      fetch(url)
+        .then(res => res.json())
+        .then(data => data.content || '')
+        .catch(() => '')
+    );
+  }
+
+  updateAgentMemoryFile(agentId: string, fileType: 'WORKING' | 'MEMORY' | string, content: string): Promise<void> {
+    const url = `${this.getMemoryApiUrl()}/api/agents/${agentId}/memory/${fileType}`;
+    return fetch(url, {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ content })
+    })
+      .then(res => {
+        if (!res.ok) throw new Error('Failed to update memory file');
+        return res.json();
+      })
+      .then(() => undefined);
+  }
+
+  getAgentDailyNotes(agentId: string): Observable<string[]> {
+    const url = `${this.getMemoryApiUrl()}/api/agents/${agentId}/memory/daily-notes`;
+    return from(
+      fetch(url)
+        .then(res => res.json())
+        .then(data => data.files || [])
+        .catch(() => [])
+    );
   }
 }
