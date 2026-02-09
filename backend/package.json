@@ -6,7 +6,9 @@
     "build": "tsc",
     "start": "node dist/index.js",
     "init-agents": "tsx scripts/init-agents.ts",
-    "init-agents-direct": "tsx scripts/init-agents-direct.ts"
+    "init-agents-direct": "tsx scripts/init-agents-direct.ts",
+    "apply-schema": "tsx scripts/apply-schema.ts",
+    "seed-test-data": "tsx scripts/seed-test-data.ts"
   },
   "dependencies": {
     "@langchain/anthropic": "^0.3.0",
