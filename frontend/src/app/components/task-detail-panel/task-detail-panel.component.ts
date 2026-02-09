@@ -38,6 +38,7 @@ export class TaskDetailPanelComponent implements OnChanges {
   private taskSubject = new BehaviorSubject<Task | null>(null);
   agents$: Observable<Agent[]>;
   messages$: Observable<Message[]>;
+  messagesWithAgents$: Observable<Array<Message & { agentName: string }>>;
   documents$: Observable<Document[]>;
   assignees$: Observable<Agent[]>;
 
@@ -61,6 +62,31 @@ export class TaskDetailPanelComponent implements OnChanges {
           );
         }
         return of([]);
+      })
+    );
+
+    // Combine messages with agent names
+    // Note: Task messages should always have fromAgentId
+    this.messagesWithAgents$ = combineLatest([
+      this.messages$,
+      this.agents$
+    ]).pipe(
+      map(([messages, agents]) => {
+        return messages.map(msg => {
+          // For task messages, fromAgentId should always be set
+          // But handle null case just in case
+          if (!msg.fromAgentId) {
+            return {
+              ...msg,
+              agentName: 'Unknown'
+            };
+          }
+          const agent = agents.find(a => a._id === msg.fromAgentId);
+          return {
+            ...msg,
+            agentName: agent?.name || msg.fromAgentId || 'Unknown'
+          };
+        });
       })
     );
 

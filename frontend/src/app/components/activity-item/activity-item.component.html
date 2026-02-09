@@ -1,7 +1,13 @@
 <div class="activity-item">
-  <span class="activity-dot"></span>
+  <span class="activity-dot" [style.background-color]="getBulletColor()"></span>
   <div class="activity-content">
-    <span class="activity-text">{{ activity.message }}</span>
+    <div class="activity-header">
+      <span class="activity-text">{{ activity.message }}</span>
+      <div class="activity-meta" *ngIf="activity.eventTag || activity.originator">
+        <span class="activity-tag" *ngIf="activity.eventTag">{{ getEventTagLabel() }}</span>
+        <span class="activity-originator" *ngIf="activity.originator">by {{ activity.originator }}</span>
+      </div>
+    </div>
     <span class="activity-time">{{ activity.createdAt | timeAgo: true }}</span>
   </div>
 </div>

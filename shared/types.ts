@@ -32,8 +32,9 @@ export interface Task {
 export interface Message {
   _id: string;
   _creationTime: number;
-  taskId: string;
-  fromAgentId: string;
+  taskId: string | null;
+  chatThreadId: string | null;
+  fromAgentId: string | null; // null = user message, UUID = agent message
   content: string;
   attachments: string[];
   createdAt: number;
@@ -47,6 +48,8 @@ export interface Activity {
   agentId: string | null;
   taskId: string | null;
   message: string;
+  eventTag?: string | null;
+  originator?: string | null;
   createdAt: number;
 }
 

@@ -1,8 +1,9 @@
 import { Injectable } from '@angular/core';
 import { createClient, SupabaseClient, RealtimeChannel } from '@supabase/supabase-js';
-import { Observable, from, BehaviorSubject } from 'rxjs';
-import { map, startWith, catchError } from 'rxjs/operators';
-import { Agent, Task, Message, Activity, Document, Notification, Proposal, ProposedStep } from '../models/types';
+import { Observable, from, BehaviorSubject, combineLatest } from 'rxjs';
+import { map, startWith, catchError, switchMap } from 'rxjs/operators';
+import { Agent, Task, Message, Activity, Document, Notification, Proposal, ProposedStep, ChatThread, Tenant } from '../models/types';
+import { TenantContextService } from './tenant-context.service';
 
 @Injectable({
   providedIn: 'root'
@@ -11,7 +12,7 @@ export class SupabaseService {
   private client: SupabaseClient | null = null;
   private channels: Map<string, RealtimeChannel> = new Map();
 
-  constructor() {
+  constructor(private tenantContext: TenantContextService) {
     // For local development, use Supabase CLI default URL and anon key
     // These are the default values when running `supabase start`
     const supabaseUrl = (window as any).SUPABASE_URL || 'http://127.0.0.1:54321';
@@ -20,17 +21,26 @@ export class SupabaseService {
     
     this.client = createClient(supabaseUrl, supabaseAnonKey);
   }
+  
+  /**
+   * Get current tenant ID
+   */
+  private getTenantId(): string {
+    return this.tenantContext.getCurrentTenantIdSync();
+  }
 
   // Agents
   getAgents(): Observable<Agent[]> {
     if (!this.client) return new BehaviorSubject<Agent[]>([]).asObservable();
     
-    const channel = this.getChannel('agents');
+    const tenantId = this.getTenantId();
+    const channel = this.getChannel(`agents-${tenantId}`);
     
     return new Observable(observer => {
       // Initial fetch
       Promise.resolve(this.client!.from('agents')
         .select('*')
+        .eq('tenant_id', tenantId)
         .order('name'))
         .then(({ data, error }) => {
           if (error) {
@@ -48,11 +58,12 @@ export class SupabaseService {
       // Subscribe to changes
       const subscription = channel
         .on('postgres_changes', 
-          { event: '*', schema: 'public', table: 'agents' },
+          { event: '*', schema: 'public', table: 'agents', filter: `tenant_id=eq.${tenantId}` },
           () => {
             // Refetch on change
             Promise.resolve(this.client!.from('agents')
               .select('*')
+              .eq('tenant_id', tenantId)
               .order('name'))
               .then(({ data, error }) => {
                 if (error) {
@@ -80,7 +91,8 @@ export class SupabaseService {
       return new BehaviorSubject<Task[]>([]).asObservable();
     }
     
-    const channel = this.getChannel(`tasks-${status || 'all'}`);
+    const tenantId = this.getTenantId();
+    const channel = this.getChannel(`tasks-${tenantId}-${status || 'all'}`);
     
     return new Observable<Task[]>(observer => {
       // Initial fetch with joins
@@ -91,6 +103,7 @@ export class SupabaseService {
             agent_id
           )
         `)
+        .eq('tenant_id', tenantId)
         .order('created_at', { ascending: false });
       
       if (status) {
@@ -112,7 +125,7 @@ export class SupabaseService {
       // Subscribe to changes
       const subscription = channel
         .on('postgres_changes',
-          { event: '*', schema: 'public', table: 'tasks' },
+          { event: '*', schema: 'public', table: 'tasks', filter: `tenant_id=eq.${tenantId}` },
           () => {
             let refetchQuery = this.client!.from('tasks')
               .select(`
@@ -121,6 +134,7 @@ export class SupabaseService {
                   agent_id
                 )
               `)
+              .eq('tenant_id', tenantId)
               .order('created_at', { ascending: false });
             
             if (status) {
@@ -155,6 +169,8 @@ export class SupabaseService {
   getTask(id: string): Observable<Task | null> {
     if (!this.client) return new BehaviorSubject<Task | null>(null).asObservable();
     
+    const tenantId = this.getTenantId();
+    
     return from(
       Promise.resolve(this.client.from('tasks')
         .select(`
@@ -164,6 +180,7 @@ export class SupabaseService {
           )
         `)
         .eq('id', id)
+        .eq('tenant_id', tenantId)
         .single())
         .then(({ data, error }) => {
           if (error && error.code !== 'PGRST116') throw error;
@@ -175,20 +192,48 @@ export class SupabaseService {
   createTask(title: string, description: string, priority: 'low' | 'medium' | 'high', assigneeIds?: string[]): Promise<string> {
     if (!this.client) return Promise.reject(new Error('Supabase client not initialized'));
     
-    return Promise.resolve(this.client.rpc('create_task', {
-      p_title: title,
-      p_description: description,
-      p_priority: priority,
-      p_assignee_ids: assigneeIds || []
-    })).then(({ data, error }) => {
-      if (error) throw error;
-      return data as string;
-    });
+    const tenantId = this.getTenantId();
+    const now = Date.now();
+    
+    // Create task directly since RPC might not support tenant_id yet
+    return Promise.resolve(this.client.from('tasks')
+      .insert({
+        title,
+        description,
+        priority,
+        status: assigneeIds && assigneeIds.length > 0 ? 'assigned' : 'inbox',
+        tenant_id: tenantId,
+        created_at: now,
+        updated_at: now
+      })
+      .select('id')
+      .single())
+      .then(async ({ data: task, error: taskError }) => {
+        if (taskError) throw taskError;
+        if (!task) throw new Error('Task creation failed');
+        
+        // Create assignments if provided
+        if (assigneeIds && assigneeIds.length > 0) {
+          const assignments = assigneeIds.map(agentId => ({
+            task_id: task.id,
+            agent_id: agentId,
+            tenant_id: tenantId
+          }));
+          
+          const { error: assignError } = await this.client!.from('task_assignments')
+            .insert(assignments);
+          
+          if (assignError) throw assignError;
+        }
+        
+        return task.id;
+      });
   }
 
   updateTask(id: string, updates: Partial<Task>): Promise<void> {
     if (!this.client) return Promise.reject(new Error('Supabase client not initialized'));
     
+    const tenantId = this.getTenantId();
     const updateData: any = {
       updated_at: Date.now()
     };
@@ -203,7 +248,8 @@ export class SupabaseService {
     
     return Promise.resolve(this.client.from('tasks')
       .update(updateData)
-      .eq('id', id))
+      .eq('id', id)
+      .eq('tenant_id', tenantId))
       .then(({ error }) => {
         if (error) throw error;
       });
@@ -213,7 +259,8 @@ export class SupabaseService {
   getMessages(taskId: string): Observable<Message[]> {
     if (!this.client) return new BehaviorSubject<Message[]>([]).asObservable();
     
-    const channel = this.getChannel(`messages-${taskId}`);
+    const tenantId = this.getTenantId();
+    const channel = this.getChannel(`messages-${tenantId}-${taskId}`);
     
     return new Observable(observer => {
       // Initial fetch
@@ -224,6 +271,7 @@ export class SupabaseService {
           message_mentions (agent_id)
         `)
         .eq('task_id', taskId)
+        .eq('tenant_id', tenantId)
         .order('created_at', { ascending: false }))
         .then(({ data, error }) => {
           if (error) {
@@ -250,6 +298,7 @@ export class SupabaseService {
                 message_mentions (agent_id)
               `)
               .eq('task_id', taskId)
+              .eq('tenant_id', tenantId)
               .order('created_at', { ascending: false }))
               .then(({ data, error }) => {
                 if (error) {
@@ -274,27 +323,54 @@ export class SupabaseService {
   createMessage(taskId: string, fromAgentId: string, content: string, mentions?: string[]): Promise<string> {
     if (!this.client) return Promise.reject(new Error('Supabase client not initialized'));
     
-    return Promise.resolve(this.client.rpc('create_message', {
-      p_task_id: taskId,
-      p_from_agent_id: fromAgentId,
-      p_content: content,
-      p_mentions: mentions || []
-    })).then(({ data, error }) => {
-      if (error) throw error;
-      return data as string;
-    });
+    const tenantId = this.getTenantId();
+    const now = Date.now();
+    
+    // Create message directly
+    return Promise.resolve(this.client.from('messages')
+      .insert({
+        task_id: taskId,
+        from_agent_id: fromAgentId,
+        content,
+        tenant_id: tenantId,
+        created_at: now
+      })
+      .select('id')
+      .single())
+      .then(async ({ data: message, error: messageError }) => {
+        if (messageError) throw messageError;
+        if (!message) throw new Error('Message creation failed');
+        
+        // Create mentions if provided
+        if (mentions && mentions.length > 0) {
+          const mentionRecords = mentions.map(agentId => ({
+            message_id: message.id,
+            agent_id: agentId,
+            tenant_id: tenantId
+          }));
+          
+          const { error: mentionError } = await this.client!.from('message_mentions')
+            .insert(mentionRecords);
+          
+          if (mentionError) throw mentionError;
+        }
+        
+        return message.id;
+      });
   }
 
   // Activities
   getActivityFeed(limit: number = 50): Observable<Activity[]> {
     if (!this.client) return new BehaviorSubject<Activity[]>([]).asObservable();
     
-    const channel = this.getChannel('activities');
+    const tenantId = this.getTenantId();
+    const channel = this.getChannel(`activities-${tenantId}`);
     
     return new Observable(observer => {
       // Initial fetch
       Promise.resolve(this.client!.from('activities')
         .select('*')
+        .eq('tenant_id', tenantId)
         .order('created_at', { ascending: false })
         .limit(limit))
         .then(({ data, error }) => {
@@ -313,10 +389,11 @@ export class SupabaseService {
       // Subscribe to changes
       const subscription = channel
         .on('postgres_changes',
-          { event: 'INSERT', schema: 'public', table: 'activities' },
+          { event: 'INSERT', schema: 'public', table: 'activities', filter: `tenant_id=eq.${tenantId}` },
           () => {
             Promise.resolve(this.client!.from('activities')
               .select('*')
+              .eq('tenant_id', tenantId)
               .order('created_at', { ascending: false })
               .limit(limit))
               .then(({ data, error }) => {
@@ -343,10 +420,13 @@ export class SupabaseService {
   getDocuments(taskId: string): Observable<Document[]> {
     if (!this.client) return new BehaviorSubject<Document[]>([]).asObservable();
     
+    const tenantId = this.getTenantId();
+    
     return from(
       Promise.resolve(this.client.from('documents')
         .select('*')
         .eq('task_id', taskId)
+        .eq('tenant_id', tenantId)
         .order('created_at', { ascending: false }))
         .then(({ data, error }) => {
           if (error) throw error;
@@ -358,13 +438,16 @@ export class SupabaseService {
   createDocument(title: string, content: string, type: Document['type'], createdBy: string, taskId?: string): Promise<string> {
     if (!this.client) return Promise.reject(new Error('Supabase client not initialized'));
     
+    const tenantId = this.getTenantId();
+    
     return Promise.resolve(this.client.from('documents')
       .insert({
         title,
         content,
         type,
         created_by: createdBy,
-        task_id: taskId || null
+        task_id: taskId || null,
+        tenant_id: tenantId
       })
       .select('id')
       .single())
@@ -377,10 +460,13 @@ export class SupabaseService {
   getDocumentById(documentId: string): Observable<Document | null> {
     if (!this.client) return new BehaviorSubject<Document | null>(null).asObservable();
     
+    const tenantId = this.getTenantId();
+    
     return from(
       Promise.resolve(this.client.from('documents')
         .select('*')
         .eq('id', documentId)
+        .eq('tenant_id', tenantId)
         .single())
         .then(({ data, error }) => {
           if (error && error.code !== 'PGRST116') throw error;
@@ -392,7 +478,8 @@ export class SupabaseService {
   getDocumentMessages(documentId: string): Observable<Message[]> {
     if (!this.client) return new BehaviorSubject<Message[]>([]).asObservable();
     
-    const channel = this.getChannel(`document-messages-${documentId}`);
+    const tenantId = this.getTenantId();
+    const channel = this.getChannel(`document-messages-${tenantId}-${documentId}`);
     
     return new Observable(observer => {
       // Fetch messages that reference this document:
@@ -403,13 +490,15 @@ export class SupabaseService {
         Promise.resolve(this.client!.from('documents')
           .select('message_id')
           .eq('id', documentId)
+          .eq('tenant_id', tenantId)
           .single())
           .then(({ data: docData }) => docData?.message_id || null)
           .catch(() => null),
         // Get messages with this document attached
         Promise.resolve(this.client!.from('message_attachments')
           .select('message_id')
-          .eq('document_id', documentId))
+          .eq('document_id', documentId)
+          .eq('tenant_id', tenantId))
           .then(({ data }) => (data || []).map((ma: any) => ma.message_id))
           .catch(() => [])
       ]).then(([directMessageId, attachmentMessageIds]) => {
@@ -431,6 +520,7 @@ export class SupabaseService {
             message_mentions (agent_id)
           `)
           .in('id', messageIds)
+          .eq('tenant_id', tenantId)
           .order('created_at', { ascending: false }))
           .then(({ data, error }) => {
             if (error) {
@@ -449,19 +539,21 @@ export class SupabaseService {
       // Subscribe to changes
       const subscription = channel
         .on('postgres_changes',
-          { event: '*', schema: 'public', table: 'message_attachments' },
+          { event: '*', schema: 'public', table: 'message_attachments', filter: `tenant_id=eq.${tenantId}` },
           () => {
             // Refetch on change
             Promise.all([
               Promise.resolve(this.client!.from('documents')
                 .select('message_id')
                 .eq('id', documentId)
+                .eq('tenant_id', tenantId)
                 .single())
                 .then(({ data: docData }) => docData?.message_id || null)
                 .catch(() => null),
               Promise.resolve(this.client!.from('message_attachments')
                 .select('message_id')
-                .eq('document_id', documentId))
+                .eq('document_id', documentId)
+                .eq('tenant_id', tenantId))
                 .then(({ data }) => (data || []).map((ma: any) => ma.message_id))
                 .catch(() => [])
             ]).then(([directMessageId, attachmentMessageIds]) => {
@@ -482,6 +574,7 @@ export class SupabaseService {
                   message_mentions (agent_id)
                 `)
                 .in('id', messageIds)
+                .eq('tenant_id', tenantId)
                 .order('created_at', { ascending: false }))
                 .then(({ data, error }) => {
                   if (error) {
@@ -508,18 +601,22 @@ export class SupabaseService {
   getAgentStats(agentId: string): Observable<{ missions: number; stepsDone: number; costToday: number; events: number }> {
     if (!this.client) return new BehaviorSubject({ missions: 0, stepsDone: 0, costToday: 0, events: 0 }).asObservable();
     
+    const tenantId = this.getTenantId();
+    
     return from(
       Promise.all([
         // Get tasks assigned to agent
         Promise.resolve(this.client.from('task_assignments')
           .select('task_id')
-          .eq('agent_id', agentId))
+          .eq('agent_id', agentId)
+          .eq('tenant_id', tenantId))
           .then(({ data }) => ({ count: data?.length || 0 })),
         
         // Get activities for agent
         Promise.resolve(this.client.from('activities')
           .select('type, created_at')
-          .eq('agent_id', agentId))
+          .eq('agent_id', agentId)
+          .eq('tenant_id', tenantId))
           .then(({ data }) => {
             const activities = data || [];
             const stepsDone = activities.filter((a: any) => 
@@ -534,6 +631,7 @@ export class SupabaseService {
         Promise.resolve(this.client.from('costs')
           .select('amount')
           .eq('agent_id', agentId)
+          .eq('tenant_id', tenantId)
           .gte('created_at', new Date().setHours(0, 0, 0, 0)))
           .then(({ data, error }) => {
             if (error && error.code !== '42P01') throw error; // 42P01 = table doesn't exist
@@ -553,6 +651,8 @@ export class SupabaseService {
   getAgentTasks(agentId: string, limit: number = 10): Observable<Task[]> {
     if (!this.client) return new BehaviorSubject<Task[]>([]).asObservable();
     
+    const tenantId = this.getTenantId();
+    
     return from(
       Promise.resolve(this.client.from('task_assignments')
         .select(`
@@ -571,6 +671,7 @@ export class SupabaseService {
           )
         `)
         .eq('agent_id', agentId)
+        .eq('tenant_id', tenantId)
         .order('created_at', { ascending: false })
         .limit(limit))
         .then(({ data, error }) => {
@@ -586,6 +687,8 @@ export class SupabaseService {
   getAgentActivities(agentId: string, limit: number = 20): Observable<Activity[]> {
     if (!this.client) return new BehaviorSubject<Activity[]>([]).asObservable();
     
+    const tenantId = this.getTenantId();
+    
     return from(
       Promise.resolve(this.client.from('activities')
         .select(`
@@ -597,6 +700,7 @@ export class SupabaseService {
           )
         `)
         .eq('agent_id', agentId)
+        .eq('tenant_id', tenantId)
         .order('created_at', { ascending: false })
         .limit(limit))
         .then(({ data, error }) => {
@@ -610,7 +714,8 @@ export class SupabaseService {
   getProposalsToday(): Observable<number> {
     if (!this.client) return new BehaviorSubject<number>(0).asObservable();
     
-    const channel = this.getChannel('stats-proposals');
+    const tenantId = this.getTenantId();
+    const channel = this.getChannel(`stats-proposals-${tenantId}`);
     const todayStart = new Date();
     todayStart.setHours(0, 0, 0, 0);
     const todayStartTimestamp = todayStart.getTime();
@@ -619,6 +724,7 @@ export class SupabaseService {
       const fetchCount = () => {
         Promise.resolve(this.client!.from('proposals')
           .select('*', { count: 'exact', head: true })
+          .eq('tenant_id', tenantId)
           .gte('created_at', todayStartTimestamp))
           .then(({ count, error }) => {
             if (error) {
@@ -637,7 +743,7 @@ export class SupabaseService {
       // Subscribe to changes
       const subscription = channel
         .on('postgres_changes',
-          { event: '*', schema: 'public', table: 'proposals' },
+          { event: '*', schema: 'public', table: 'proposals', filter: `tenant_id=eq.${tenantId}` },
           () => fetchCount()
         )
         .subscribe();
@@ -651,12 +757,14 @@ export class SupabaseService {
   getCompletedMissions(): Observable<number> {
     if (!this.client) return new BehaviorSubject<number>(0).asObservable();
     
-    const channel = this.getChannel('stats-missions');
+    const tenantId = this.getTenantId();
+    const channel = this.getChannel(`stats-missions-${tenantId}`);
     
     return new Observable(observer => {
       const fetchCount = () => {
         Promise.resolve(this.client!.from('tasks')
           .select('*', { count: 'exact', head: true })
+          .eq('tenant_id', tenantId)
           .eq('status', 'done'))
           .then(({ count, error }) => {
             if (error) {
@@ -675,7 +783,7 @@ export class SupabaseService {
       // Subscribe to changes
       const subscription = channel
         .on('postgres_changes',
-          { event: '*', schema: 'public', table: 'tasks' },
+          { event: '*', schema: 'public', table: 'tasks', filter: `tenant_id=eq.${tenantId}` },
           () => fetchCount()
         )
         .subscribe();
@@ -689,12 +797,14 @@ export class SupabaseService {
   getSuccessRate(): Observable<number> {
     if (!this.client) return new BehaviorSubject<number>(0).asObservable();
     
-    const channel = this.getChannel('stats-success-rate');
+    const tenantId = this.getTenantId();
+    const channel = this.getChannel(`stats-success-rate-${tenantId}`);
     
     return new Observable(observer => {
       const fetchRate = () => {
         Promise.resolve(this.client!.from('tasks')
-          .select('status'))
+          .select('status')
+          .eq('tenant_id', tenantId))
           .then(({ data, error }) => {
             if (error) {
               console.error('Error fetching success rate:', error);
@@ -719,7 +829,7 @@ export class SupabaseService {
       // Subscribe to changes
       const subscription = channel
         .on('postgres_changes',
-          { event: '*', schema: 'public', table: 'tasks' },
+          { event: '*', schema: 'public', table: 'tasks', filter: `tenant_id=eq.${tenantId}` },
           () => fetchRate()
         )
         .subscribe();
@@ -733,7 +843,8 @@ export class SupabaseService {
   getCostToday(): Observable<number> {
     if (!this.client) return new BehaviorSubject<number>(0).asObservable();
     
-    const channel = this.getChannel('stats-costs');
+    const tenantId = this.getTenantId();
+    const channel = this.getChannel(`stats-costs-${tenantId}`);
     const todayStart = new Date();
     todayStart.setHours(0, 0, 0, 0);
     const todayStartTimestamp = todayStart.getTime();
@@ -742,6 +853,7 @@ export class SupabaseService {
       const fetchCost = () => {
         Promise.resolve(this.client!.from('costs')
           .select('amount')
+          .eq('tenant_id', tenantId)
           .gte('created_at', todayStartTimestamp))
           .then(({ data, error }) => {
             if (error && error.code !== '42P01') {
@@ -762,7 +874,7 @@ export class SupabaseService {
       // Subscribe to changes
       const subscription = channel
         .on('postgres_changes',
-          { event: '*', schema: 'public', table: 'costs' },
+          { event: '*', schema: 'public', table: 'costs', filter: `tenant_id=eq.${tenantId}` },
           () => fetchCost()
         )
         .subscribe();
@@ -776,12 +888,14 @@ export class SupabaseService {
   getBudgetRemaining(): Observable<number> {
     if (!this.client) return new BehaviorSubject<number>(0).asObservable();
     
-    const channel = this.getChannel('stats-budget');
+    const tenantId = this.getTenantId();
+    const channel = this.getChannel(`stats-budget-${tenantId}`);
     
     return new Observable(observer => {
       const fetchBudget = () => {
         Promise.resolve(this.client!.from('budget')
           .select('daily_limit, current_daily_spend')
+          .eq('tenant_id', tenantId)
           .limit(1)
           .single())
           .then(({ data, error }) => {
@@ -807,7 +921,7 @@ export class SupabaseService {
       // Subscribe to changes
       const subscription = channel
         .on('postgres_changes',
-          { event: '*', schema: 'public', table: 'budget' },
+          { event: '*', schema: 'public', table: 'budget', filter: `tenant_id=eq.${tenantId}` },
           () => fetchBudget()
         )
         .subscribe();
@@ -821,6 +935,7 @@ export class SupabaseService {
   updateAgent(agentId: string, updates: Partial<Agent>): Promise<void> {
     if (!this.client) return Promise.reject(new Error('Supabase client not initialized'));
     
+    const tenantId = this.getTenantId();
     const updateData: any = {
       updated_at: new Date().toISOString()
     };
@@ -838,7 +953,8 @@ export class SupabaseService {
     
     return Promise.resolve(this.client.from('agents')
       .update(updateData)
-      .eq('id', agentId))
+      .eq('id', agentId)
+      .eq('tenant_id', tenantId))
       .then(({ error }) => {
         if (error) throw error;
       });
@@ -848,12 +964,14 @@ export class SupabaseService {
   getProposals(status?: 'pending' | 'approved' | 'rejected'): Observable<Proposal[]> {
     if (!this.client) return new BehaviorSubject<Proposal[]>([]).asObservable();
     
-    const channel = this.getChannel(`proposals-${status || 'all'}`);
+    const tenantId = this.getTenantId();
+    const channel = this.getChannel(`proposals-${tenantId}-${status || 'all'}`);
     
     return new Observable<Proposal[]>(observer => {
       // Initial fetch
       let query = this.client!.from('proposals')
         .select('*')
+        .eq('tenant_id', tenantId)
         .order('created_at', { ascending: false });
       
       if (status) {
@@ -875,10 +993,11 @@ export class SupabaseService {
       // Subscribe to changes
       const subscription = channel
         .on('postgres_changes',
-          { event: '*', schema: 'public', table: 'proposals' },
+          { event: '*', schema: 'public', table: 'proposals', filter: `tenant_id=eq.${tenantId}` },
           () => {
             let refetchQuery = this.client!.from('proposals')
               .select('*')
+              .eq('tenant_id', tenantId)
               .order('created_at', { ascending: false });
             
             if (status) {
@@ -934,6 +1053,7 @@ export class SupabaseService {
   ): Promise<string> {
     if (!this.client) return Promise.reject(new Error('Supabase client not initialized'));
     
+    const tenantId = this.getTenantId();
     const now = Date.now();
     
     return Promise.resolve(this.client.from('proposals')
@@ -944,6 +1064,7 @@ export class SupabaseService {
         priority,
         status: 'pending',
         proposed_steps: proposedSteps || [],
+        tenant_id: tenantId,
         created_at: now,
         updated_at: now
       })
@@ -958,6 +1079,7 @@ export class SupabaseService {
   updateProposal(id: string, updates: Partial<Proposal>): Promise<void> {
     if (!this.client) return Promise.reject(new Error('Supabase client not initialized'));
     
+    const tenantId = this.getTenantId();
     const updateData: any = {
       updated_at: Date.now()
     };
@@ -969,7 +1091,8 @@ export class SupabaseService {
     
     return Promise.resolve(this.client.from('proposals')
       .update(updateData)
-      .eq('id', id))
+      .eq('id', id)
+      .eq('tenant_id', tenantId))
       .then(({ error }) => {
         if (error) throw error;
       });
@@ -978,6 +1101,7 @@ export class SupabaseService {
   approveProposal(id: string): Promise<void> {
     if (!this.client) return Promise.reject(new Error('Supabase client not initialized'));
     
+    const tenantId = this.getTenantId();
     const now = Date.now();
     
     return Promise.resolve(this.client.from('proposals')
@@ -986,7 +1110,8 @@ export class SupabaseService {
         approved_at: now,
         updated_at: now
       })
-      .eq('id', id))
+      .eq('id', id)
+      .eq('tenant_id', tenantId))
       .then(({ error }) => {
         if (error) throw error;
       });
@@ -995,6 +1120,7 @@ export class SupabaseService {
   rejectProposal(id: string): Promise<void> {
     if (!this.client) return Promise.reject(new Error('Supabase client not initialized'));
     
+    const tenantId = this.getTenantId();
     const now = Date.now();
     
     return Promise.resolve(this.client.from('proposals')
@@ -1003,7 +1129,8 @@ export class SupabaseService {
         rejected_at: now,
         updated_at: now
       })
-      .eq('id', id))
+      .eq('id', id)
+      .eq('tenant_id', tenantId))
       .then(({ error }) => {
         if (error) throw error;
       });
@@ -1012,10 +1139,13 @@ export class SupabaseService {
   convertProposalToTask(proposalId: string, assigneeIds?: string[]): Promise<string> {
     if (!this.client) return Promise.reject(new Error('Supabase client not initialized'));
     
+    const tenantId = this.getTenantId();
+    
     // Get proposal first
     return Promise.resolve(this.client.from('proposals')
       .select('*')
       .eq('id', proposalId)
+      .eq('tenant_id', tenantId)
       .single())
       .then(({ data: proposal, error }) => {
         if (error) throw error;
@@ -1024,7 +1154,7 @@ export class SupabaseService {
           throw new Error('Only approved proposals can be converted to tasks');
         }
         
-        // Create task from proposal
+        // Create task from proposal (createTask will use current tenant context)
         return this.createTask(
           proposal.title,
           proposal.description,
@@ -1053,13 +1183,15 @@ export class SupabaseService {
   getNotifications(agentId: string): Observable<Notification[]> {
     if (!this.client) return new BehaviorSubject<Notification[]>([]).asObservable();
     
-    const channel = this.getChannel(`notifications-${agentId}`);
+    const tenantId = this.getTenantId();
+    const channel = this.getChannel(`notifications-${tenantId}-${agentId}`);
     
     return new Observable(observer => {
       // Initial fetch
       Promise.resolve(this.client!.from('notifications')
         .select('*')
         .eq('mentioned_agent_id', agentId)
+        .eq('tenant_id', tenantId)
         .eq('delivered', false)
         .order('created_at', { ascending: true }))
         .then(({ data, error }) => {
@@ -1083,6 +1215,7 @@ export class SupabaseService {
             Promise.resolve(this.client!.from('notifications')
               .select('*')
               .eq('mentioned_agent_id', agentId)
+              .eq('tenant_id', tenantId)
               .eq('delivered', false)
               .order('created_at', { ascending: true }))
               .then(({ data, error }) => {
@@ -1103,6 +1236,175 @@ export class SupabaseService {
         subscription.unsubscribe();
       };
     });
+  }
+
+  // Chat Threads
+  getChatThreads(): Observable<ChatThread[]> {
+    if (!this.client) return new BehaviorSubject<ChatThread[]>([]).asObservable();
+    
+    const channel = this.getChannel('chat-threads');
+    
+    return new Observable(observer => {
+      // Initial fetch
+      Promise.resolve(this.client!.from('chat_threads')
+        .select('*')
+        .order('updated_at', { ascending: false }))
+        .then(({ data, error }) => {
+          if (error) {
+            console.error('Error fetching chat threads:', error);
+            observer.next([]);
+            return;
+          }
+          observer.next(this.transformChatThreads(data || []));
+        })
+        .catch(err => {
+          console.error('Error in chat threads query:', err);
+          observer.next([]);
+        });
+      
+      // Subscribe to changes
+      const subscription = channel
+        .on('postgres_changes',
+          { event: '*', schema: 'public', table: 'chat_threads' },
+          () => {
+            Promise.resolve(this.client!.from('chat_threads')
+              .select('*')
+              .order('updated_at', { ascending: false }))
+              .then(({ data, error }) => {
+                if (error) {
+                  console.error('Error refetching chat threads:', error);
+                  return;
+                }
+                if (data) observer.next(this.transformChatThreads(data));
+              })
+              .catch(err => {
+                console.error('Error in chat threads refetch:', err);
+              });
+          }
+        )
+        .subscribe();
+      
+      return () => {
+        subscription.unsubscribe();
+      };
+    });
+  }
+
+  getChatMessages(chatThreadId: string): Observable<Message[]> {
+    if (!this.client) return new BehaviorSubject<Message[]>([]).asObservable();
+    
+    const channel = this.getChannel(`chat-messages-${chatThreadId}`);
+    
+    return new Observable(observer => {
+      // Initial fetch
+      Promise.resolve(this.client!.from('messages')
+        .select(`
+          *,
+          message_attachments (document_id),
+          message_mentions (agent_id)
+        `)
+        .eq('chat_thread_id', chatThreadId)
+        .order('created_at', { ascending: true }))
+        .then(({ data, error }) => {
+          if (error) {
+            console.error('Error fetching chat messages:', error);
+            observer.next([]);
+            return;
+          }
+          observer.next(this.transformMessages(data || []));
+        })
+        .catch(err => {
+          console.error('Error in chat messages query:', err);
+          observer.next([]);
+        });
+      
+      // Subscribe to changes
+      const subscription = channel
+        .on('postgres_changes',
+          { event: 'INSERT', schema: 'public', table: 'messages', filter: `chat_thread_id=eq.${chatThreadId}` },
+          () => {
+            Promise.resolve(this.client!.from('messages')
+              .select(`
+                *,
+                message_attachments (document_id),
+                message_mentions (agent_id)
+              `)
+              .eq('chat_thread_id', chatThreadId)
+              .order('created_at', { ascending: true }))
+              .then(({ data, error }) => {
+                if (error) {
+                  console.error('Error refetching chat messages:', error);
+                  return;
+                }
+                if (data) observer.next(this.transformMessages(data));
+              })
+              .catch(err => {
+                console.error('Error in chat messages refetch:', err);
+              });
+          }
+        )
+        .subscribe();
+      
+      return () => {
+        subscription.unsubscribe();
+      };
+    });
+  }
+
+  createChatThread(agentId: string, title?: string): Promise<string> {
+    if (!this.client) return Promise.reject(new Error('Supabase client not initialized'));
+    
+    // For backward compatibility, we'll use the first agent as created_by
+    // but agent_id is the primary field for user-to-agent chat
+    return Promise.resolve(this.client.from('chat_threads')
+      .insert({
+        agent_id: agentId,
+        created_by: agentId, // kept for backward compatibility
+        title: title || null,
+        created_at: Date.now(),
+        updated_at: Date.now()
+      })
+      .select('id')
+      .single()).then(({ data, error }) => {
+        if (error) throw error;
+        return data.id;
+      });
+  }
+
+  createChatMessage(chatThreadId: string, content: string, fromAgentId?: string | null, mentions?: string[]): Promise<string> {
+    if (!this.client) return Promise.reject(new Error('Supabase client not initialized'));
+    
+    // fromAgentId is optional: null/undefined = user message, UUID = agent message
+    return Promise.resolve(this.client.rpc('create_chat_message', {
+      p_chat_thread_id: chatThreadId,
+      p_from_agent_id: fromAgentId || null,
+      p_content: content,
+      p_mentions: mentions || []
+    })).then(({ data, error }) => {
+      if (error) throw error;
+      return data as string;
+    });
+  }
+
+  // Tenants
+  getTenants(): Observable<Tenant[]> {
+    if (!this.client) return new BehaviorSubject<Tenant[]>([]).asObservable();
+    
+    return from(
+      Promise.resolve(this.client.from('tenants')
+        .select('*')
+        .order('name'))
+        .then(({ data, error }) => {
+          if (error) throw error;
+          return (data || []).map((tenant: any) => ({
+            id: tenant.id,
+            name: tenant.name,
+            slug: tenant.slug,
+            createdAt: tenant.created_at,
+            updatedAt: tenant.updated_at
+          }));
+        })
+    );
   }
 
   // Helper methods for transformation
@@ -1166,7 +1468,8 @@ export class SupabaseService {
       _id: msg.id,
       _creationTime: msg.created_at,
       taskId: msg.task_id,
-      fromAgentId: msg.from_agent_id,
+      chatThreadId: msg.chat_thread_id,
+      fromAgentId: msg.from_agent_id || null, // null for user messages
       content: msg.content,
       attachments: msg.message_attachments?.map((a: any) => a.document_id) || [],
       createdAt: msg.created_at,
@@ -1182,6 +1485,8 @@ export class SupabaseService {
       agentId: activity.agent_id,
       taskId: activity.task_id,
       message: activity.message,
+      eventTag: activity.event_tag,
+      originator: activity.originator,
       createdAt: activity.created_at
     }));
   }
@@ -1245,6 +1550,18 @@ export class SupabaseService {
       approvedAt: proposal.approved_at,
       rejectedAt: proposal.rejected_at
     };
+  }
+
+  private transformChatThreads(data: any[]): ChatThread[] {
+    return data.map(thread => ({
+      _id: thread.id,
+      _creationTime: thread.created_at,
+      title: thread.title,
+      createdBy: thread.created_by || thread.agent_id, // fallback for backward compatibility
+      agentId: thread.agent_id || thread.created_by, // primary field
+      createdAt: thread.created_at,
+      updatedAt: thread.updated_at
+    }));
   }
 
   private getChannel(name: string): RealtimeChannel {

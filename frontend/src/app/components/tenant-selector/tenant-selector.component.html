@@ -1,0 +1,29 @@
+<div class="tenant-selector">
+  <button 
+    class="tenant-btn" 
+    (click)="toggleDropdown()"
+    type="button"
+    [attr.aria-expanded]="isOpen"
+    aria-haspopup="true"
+  >
+    <span class="tenant-label" *ngIf="currentTenant$ | async as tenant">
+      {{ tenant.name }}
+    </span>
+    <span class="tenant-label" *ngIf="!(currentTenant$ | async)">
+      Select Tenant
+    </span>
+    <span class="dropdown-icon" [class.open]="isOpen">▼</span>
+  </button>
+  
+  <div class="dropdown" *ngIf="isOpen">
+    <div 
+      class="dropdown-item" 
+      *ngFor="let tenant of tenants$ | async"
+      (click)="selectTenant(tenant)"
+      [class.active]="(currentTenantId$ | async) === tenant.id"
+    >
+      <span class="tenant-name">{{ tenant.name }}</span>
+      <span class="tenant-slug">{{ tenant.slug }}</span>
+    </div>
+  </div>
+</div>

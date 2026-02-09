@@ -5,13 +5,17 @@ import * as notificationsFunctions from './notifications';
 
 const supabase = getSupabaseClient();
 
-export async function getAllTasks(status?: string) {
+export async function getAllTasks(status?: string, tenantId?: string) {
   let query = supabase.from('tasks').select(`
     *,
     task_assignments (
       agent_id
     )
   `);
+  
+  if (tenantId) {
+    query = query.eq('tenant_id', tenantId);
+  }
   
   if (status) {
     query = query.eq('status', status);
@@ -78,6 +82,7 @@ export async function createTask(params: {
   description: string;
   priority: 'low' | 'medium' | 'high';
   assigneeIds?: string[];
+  tenantId: string;
 }) {
   const now = Date.now();
   
@@ -89,7 +94,8 @@ export async function createTask(params: {
       status: params.assigneeIds && params.assigneeIds.length > 0 ? 'assigned' : 'inbox',
       priority: params.priority,
       created_at: now,
-      updated_at: now
+      updated_at: now,
+      tenant_id: params.tenantId
     })
     .select()
     .single();
@@ -100,7 +106,8 @@ export async function createTask(params: {
   if (params.assigneeIds && params.assigneeIds.length > 0) {
     const assignments = params.assigneeIds.map(agentId => ({
       task_id: task.id,
-      agent_id: agentId
+      agent_id: agentId,
+      tenant_id: params.tenantId
     }));
     
     const { error: assignError } = await supabase

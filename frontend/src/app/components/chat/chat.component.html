@@ -1,0 +1,87 @@
+<div class="chat-container">
+  <div class="chat-sidebar">
+    <div class="sidebar-header">
+      <h2 class="sidebar-title">Chat Threads</h2>
+      <button class="new-thread-btn" (click)="createNewThread()" type="button">
+        + New Thread
+      </button>
+    </div>
+    
+    <div class="agent-selector">
+      <label for="agent-select">Chat with:</label>
+      <select 
+        id="agent-select" 
+        [(ngModel)]="selectedAgentId"
+        class="agent-select">
+        <option [value]="null" disabled>Select agent</option>
+        <option *ngFor="let agent of agents$ | async" [value]="agent._id">
+          {{ agent.name }}
+        </option>
+      </select>
+    </div>
+
+    <div class="threads-list" *ngIf="chatThreads$ | async as threads">
+      <div 
+        *ngFor="let thread of threads" 
+        class="thread-item"
+        [class.selected]="(selectedThreadId$ | async) === thread._id"
+        (click)="selectThread(thread._id)">
+        <div class="thread-title">
+          {{ thread.title || 'Untitled Thread' }}
+        </div>
+        <div class="thread-meta">
+          {{ thread.updatedAt | timeAgo }}
+        </div>
+      </div>
+      <div *ngIf="threads.length === 0" class="empty-state">
+        <p>No chat threads yet</p>
+        <p class="empty-hint">Create a new thread to start chatting</p>
+      </div>
+    </div>
+  </div>
+
+  <div class="chat-main">
+    <div *ngIf="selectedThreadId$ | async; else noThreadSelected" class="chat-messages-container">
+      <div class="messages-list" *ngIf="messagesWithAgents$ | async as messages">
+        <div *ngFor="let message of messages" class="message-item" [class.user-message]="message.isUser" [class.agent-message]="!message.isUser">
+          <div class="message-header">
+            <div class="message-avatar" *ngIf="message.senderAvatar">
+              <img [src]="message.senderAvatar" [alt]="message.senderName" />
+            </div>
+            <div class="message-avatar" *ngIf="!message.senderAvatar">
+              <span class="avatar-initial">{{ message.senderName.charAt(0).toUpperCase() }}</span>
+            </div>
+            <div class="message-info">
+              <span class="message-sender">{{ message.senderName }}</span>
+              <span class="message-time">{{ message.createdAt | timeAgo }}</span>
+            </div>
+          </div>
+          <div class="message-content" [innerHTML]="message.content | markdown"></div>
+        </div>
+      </div>
+
+      <div class="message-input-container">
+        <textarea
+          class="message-input"
+          [(ngModel)]="newMessageContent"
+          (keydown)="onKeyDown($event)"
+          placeholder="Type a message... (Press Enter to send, Shift+Enter for new line)"
+          rows="3">
+        </textarea>
+        <button 
+          class="send-button"
+          (click)="sendMessage()"
+          [disabled]="!newMessageContent.trim()"
+          type="button">
+          Send
+        </button>
+      </div>
+    </div>
+
+    <ng-template #noThreadSelected>
+      <div class="no-thread-selected">
+        <p>Select a thread from the sidebar or create a new one to start chatting</p>
+      </div>
+    </ng-template>
+  </div>
+</div>

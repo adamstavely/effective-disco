@@ -60,13 +60,15 @@ BEGIN
   WHERE id = p_task_id;
   
   -- Create activity
-  INSERT INTO activities (type, agent_id, task_id, message, created_at)
+  INSERT INTO activities (type, agent_id, task_id, message, created_at, event_tag, originator)
   VALUES (
     'status_changed',
     v_agent_id,
     p_task_id,
     format('Task "%s" resumed - agent %s notified to continue work', v_task.title, COALESCE(v_agent_name, 'Unknown')),
-    v_now
+    v_now,
+    'update',
+    COALESCE(v_agent_name, 'System')
   );
   
   -- Return result

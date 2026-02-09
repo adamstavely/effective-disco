@@ -56,16 +56,37 @@ CREATE TABLE task_assignments (
 CREATE INDEX idx_task_assignments_task ON task_assignments(task_id);
 CREATE INDEX idx_task_assignments_agent ON task_assignments(agent_id);
 
+-- Chat threads table
+-- Users chat WITH agents, not AS agents
+CREATE TABLE chat_threads (
+    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    title VARCHAR(500),
+    created_by UUID NOT NULL REFERENCES agents(id) ON DELETE CASCADE, -- kept for backward compatibility
+    agent_id UUID NOT NULL REFERENCES agents(id) ON DELETE CASCADE, -- the agent the user is chatting with
+    created_at BIGINT NOT NULL DEFAULT EXTRACT(EPOCH FROM NOW()) * 1000,
+    updated_at BIGINT NOT NULL DEFAULT EXTRACT(EPOCH FROM NOW()) * 1000
+);
+
+CREATE INDEX idx_chat_threads_created_at ON chat_threads(created_at DESC);
+CREATE INDEX idx_chat_threads_created_by ON chat_threads(created_by);
+CREATE INDEX idx_chat_threads_agent ON chat_threads(agent_id);
+
 -- Messages table
+-- from_agent_id can be NULL for user messages in chat threads
+-- For task messages, from_agent_id should always be set (agents post to tasks)
 CREATE TABLE messages (
     id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
-    task_id UUID NOT NULL REFERENCES tasks(id) ON DELETE CASCADE,
-    from_agent_id UUID NOT NULL REFERENCES agents(id) ON DELETE CASCADE,
+    task_id UUID REFERENCES tasks(id) ON DELETE CASCADE,
+    chat_thread_id UUID REFERENCES chat_threads(id) ON DELETE CASCADE,
+    from_agent_id UUID REFERENCES agents(id) ON DELETE CASCADE, -- NULL = user message, UUID = agent message
     content TEXT NOT NULL,
-    created_at BIGINT NOT NULL DEFAULT EXTRACT(EPOCH FROM NOW()) * 1000
+    created_at BIGINT NOT NULL DEFAULT EXTRACT(EPOCH FROM NOW()) * 1000,
+    CHECK ((task_id IS NOT NULL) OR (chat_thread_id IS NOT NULL)),
+    CHECK ((task_id IS NULL) OR (from_agent_id IS NOT NULL)) -- Task messages must have from_agent_id
 );
 
 CREATE INDEX idx_messages_task ON messages(task_id);
+CREATE INDEX idx_messages_chat_thread ON messages(chat_thread_id);
 CREATE INDEX idx_messages_agent ON messages(from_agent_id);
 CREATE INDEX idx_messages_created_at ON messages(created_at DESC);
 
@@ -98,6 +119,8 @@ CREATE TABLE activities (
     agent_id UUID REFERENCES agents(id) ON DELETE SET NULL,
     task_id UUID REFERENCES tasks(id) ON DELETE SET NULL,
     message TEXT NOT NULL,
+    event_tag VARCHAR(100),
+    originator VARCHAR(255),
     created_at BIGINT NOT NULL DEFAULT EXTRACT(EPOCH FROM NOW()) * 1000
 );
 
@@ -105,6 +128,7 @@ CREATE INDEX idx_activities_type ON activities(type);
 CREATE INDEX idx_activities_task ON activities(task_id);
 CREATE INDEX idx_activities_agent ON activities(agent_id);
 CREATE INDEX idx_activities_created_at ON activities(created_at DESC);
+CREATE INDEX idx_activities_event_tag ON activities(event_tag);
 
 -- Documents table
 CREATE TABLE documents (
@@ -212,8 +236,8 @@ CREATE TRIGGER update_proposals_updated_at BEFORE UPDATE ON proposals
 CREATE OR REPLACE FUNCTION create_task_activity()
 RETURNS TRIGGER AS $$
 BEGIN
-    INSERT INTO activities (type, agent_id, task_id, message, created_at)
-    VALUES ('task_created', NULL, NEW.id, 'Task "' || NEW.title || '" created', NEW.created_at);
+    INSERT INTO activities (type, agent_id, task_id, message, created_at, event_tag, originator)
+    VALUES ('task_created', NULL, NEW.id, 'Task "' || NEW.title || '" created', NEW.created_at, 'creation', 'System');
     RETURN NEW;
 END;
 $$ language 'plpgsql';
@@ -229,14 +253,17 @@ DECLARE
 BEGIN
     SELECT name INTO agent_name FROM agents WHERE id = NEW.from_agent_id;
     
-    INSERT INTO activities (type, agent_id, task_id, message, created_at)
-    VALUES ('message_sent', NEW.from_agent_id, NEW.task_id, 
-            COALESCE(agent_name, 'Agent') || ' commented on task', NEW.created_at);
-    
-    -- Auto-subscribe agent to thread
-    INSERT INTO thread_subscriptions (agent_id, task_id, subscribed_at)
-    VALUES (NEW.from_agent_id, NEW.task_id, NEW.created_at)
-    ON CONFLICT (agent_id, task_id) DO NOTHING;
+    -- Only create activity for task-related messages
+    IF NEW.task_id IS NOT NULL THEN
+        INSERT INTO activities (type, agent_id, task_id, message, created_at, event_tag, originator)
+        VALUES ('message_sent', NEW.from_agent_id, NEW.task_id, 
+                COALESCE(agent_name, 'Agent') || ' commented on task', NEW.created_at, 'message', COALESCE(agent_name, 'Agent'));
+        
+        -- Auto-subscribe agent to thread
+        INSERT INTO thread_subscriptions (agent_id, task_id, subscribed_at)
+        VALUES (NEW.from_agent_id, NEW.task_id, NEW.created_at)
+        ON CONFLICT (agent_id, task_id) DO NOTHING;
+    END IF;
     
     RETURN NEW;
 END;
@@ -249,9 +276,11 @@ CREATE TRIGGER message_sent_activity AFTER INSERT ON messages
 CREATE OR REPLACE FUNCTION update_task_last_message_at()
 RETURNS TRIGGER AS $$
 BEGIN
-    UPDATE tasks
-    SET last_message_at = NEW.created_at
-    WHERE id = NEW.task_id;
+    IF NEW.task_id IS NOT NULL THEN
+        UPDATE tasks
+        SET last_message_at = NEW.created_at
+        WHERE id = NEW.task_id;
+    END IF;
     RETURN NEW;
 END;
 $$ language 'plpgsql';
@@ -284,15 +313,18 @@ CREATE TRIGGER mention_notifications AFTER INSERT ON messages
 CREATE OR REPLACE FUNCTION notify_thread_subscribers()
 RETURNS TRIGGER AS $$
 BEGIN
-    INSERT INTO notifications (mentioned_agent_id, content, task_id, delivered, created_at)
-    SELECT 
-        ts.agent_id,
-        NEW.content,
-        NEW.task_id,
-        FALSE,
-        NEW.created_at
-    FROM thread_subscriptions ts
-    WHERE ts.task_id = NEW.task_id AND ts.agent_id != NEW.from_agent_id;
+    -- Only notify for task-related messages
+    IF NEW.task_id IS NOT NULL THEN
+        INSERT INTO notifications (mentioned_agent_id, content, task_id, delivered, created_at)
+        SELECT 
+            ts.agent_id,
+            NEW.content,
+            NEW.task_id,
+            FALSE,
+            NEW.created_at
+        FROM thread_subscriptions ts
+        WHERE ts.task_id = NEW.task_id AND ts.agent_id != NEW.from_agent_id;
+    END IF;
     
     RETURN NEW;
 END;
@@ -300,6 +332,22 @@ $$ language 'plpgsql';
 
 CREATE TRIGGER thread_subscriber_notifications AFTER INSERT ON messages
     FOR EACH ROW EXECUTE FUNCTION notify_thread_subscribers();
+
+-- Function to update chat_thread updated_at
+CREATE OR REPLACE FUNCTION update_chat_thread_updated_at()
+RETURNS TRIGGER AS $$
+BEGIN
+    IF NEW.chat_thread_id IS NOT NULL THEN
+        UPDATE chat_threads
+        SET updated_at = EXTRACT(EPOCH FROM NOW()) * 1000
+        WHERE id = NEW.chat_thread_id;
+    END IF;
+    RETURN NEW;
+END;
+$$ language 'plpgsql';
+
+CREATE TRIGGER update_chat_thread_updated_at_trigger AFTER INSERT ON messages
+    FOR EACH ROW EXECUTE FUNCTION update_chat_thread_updated_at();
 
 -- Enable Row Level Security (RLS)
 ALTER TABLE agents ENABLE ROW LEVEL SECURITY;
@@ -312,6 +360,7 @@ ALTER TABLE thread_subscriptions ENABLE ROW LEVEL SECURITY;
 ALTER TABLE proposals ENABLE ROW LEVEL SECURITY;
 ALTER TABLE costs ENABLE ROW LEVEL SECURITY;
 ALTER TABLE budget ENABLE ROW LEVEL SECURITY;
+ALTER TABLE chat_threads ENABLE ROW LEVEL SECURITY;
 
 -- RLS Policies (allow all for now - can be restricted later)
 CREATE POLICY "Allow all operations on agents" ON agents FOR ALL USING (true);
@@ -324,3 +373,4 @@ CREATE POLICY "Allow all operations on thread_subscriptions" ON thread_subscript
 CREATE POLICY "Allow all operations on proposals" ON proposals FOR ALL USING (true);
 CREATE POLICY "Allow all operations on costs" ON costs FOR ALL USING (true);
 CREATE POLICY "Allow all operations on budget" ON budget FOR ALL USING (true);
+CREATE POLICY "Allow all operations on chat_threads" ON chat_threads FOR ALL USING (true);

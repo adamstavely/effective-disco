@@ -16,7 +16,9 @@ export async function getActivityFeed(limit: number = 50) {
     _id: activity.id,
     _creationTime: activity.created_at,
     agentId: activity.agent_id,
-    taskId: activity.task_id
+    taskId: activity.task_id,
+    eventTag: activity.event_tag,
+    originator: activity.originator
   })) || [];
 }
 
@@ -35,7 +37,9 @@ export async function getActivitiesByType(type: string, limit: number = 50) {
     _id: activity.id,
     _creationTime: activity.created_at,
     agentId: activity.agent_id,
-    taskId: activity.task_id
+    taskId: activity.task_id,
+    eventTag: activity.event_tag,
+    originator: activity.originator
   })) || [];
 }
 
@@ -54,6 +58,8 @@ export async function getActivitiesByAgent(agentId: string, limit: number = 50) 
     _id: activity.id,
     _creationTime: activity.created_at,
     agentId: activity.agent_id,
-    taskId: activity.task_id
+    taskId: activity.task_id,
+    eventTag: activity.event_tag,
+    originator: activity.originator
   })) || [];
 }

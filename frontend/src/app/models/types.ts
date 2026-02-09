@@ -49,12 +49,23 @@ export interface Task {
 export interface Message {
   _id: string;
   _creationTime: number;
-  taskId: string;
-  fromAgentId: string;
+  taskId: string | null;
+  chatThreadId: string | null;
+  fromAgentId: string | null; // null = user message, UUID = agent message
   content: string;
   attachments: string[];
   createdAt: number;
   mentions: string[];
+}
+
+export interface ChatThread {
+  _id: string;
+  _creationTime: number;
+  title: string | null;
+  createdBy: string; // kept for backward compatibility, but agentId is the primary field
+  agentId: string; // the agent the user is chatting with
+  createdAt: number;
+  updatedAt: number;
 }
 
 export interface Activity {
@@ -64,6 +75,8 @@ export interface Activity {
   agentId: string | null;
   taskId: string | null;
   message: string;
+  eventTag?: string | null;
+  originator?: string | null;
   createdAt: number;
 }
 
@@ -103,4 +116,12 @@ export interface Proposal {
   updatedAt: number;
   approvedAt?: number;
   rejectedAt?: number;
+}
+
+export interface Tenant {
+  id: string;
+  name: string;
+  slug: string;
+  createdAt: string;
+  updatedAt: string;
 }

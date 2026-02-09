@@ -176,11 +176,11 @@
         <h3>Comments</h3>
       </div>
       <div class="section-content">
-        <div *ngIf="messages$ | async as messages">
+        <div *ngIf="messagesWithAgents$ | async as messages">
           <div *ngIf="messages.length > 0; else noMessages" class="comments-list">
             <div *ngFor="let message of messages" class="comment-item">
               <div class="comment-header">
-                <span class="comment-agent">{{ message.fromAgentId }}</span>
+                <span class="comment-agent">{{ message.agentName }}</span>
                 <span class="comment-time">{{ message.createdAt | timeAgo }}</span>
               </div>
               <div class="comment-content" [innerHTML]="message.content | markdown"></div>

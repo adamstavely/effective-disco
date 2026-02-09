@@ -13,6 +13,10 @@
     </div>
   </div>
   <div class="nav-right">
+    <app-tenant-selector></app-tenant-selector>
+    <button class="chat-btn" (click)="onChatClick()" type="button" title="Open Chat">
+      💬 Chat
+    </button>
     <button class="docs-btn">Docs</button>
     <div class="timestamp" *ngIf="currentTime$ | async as currentTime">
       <span class="time">{{ formatTime(currentTime) }}</span>

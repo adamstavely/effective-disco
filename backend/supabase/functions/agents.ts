@@ -2,22 +2,32 @@ import { getSupabaseClient } from '../client';
 
 const supabase = getSupabaseClient();
 
-export async function getAllAgents() {
-  const { data, error } = await supabase
+export async function getAllAgents(tenantId?: string) {
+  let query = supabase
     .from('agents')
-    .select('*')
-    .order('name');
+    .select('*');
+  
+  if (tenantId) {
+    query = query.eq('tenant_id', tenantId);
+  }
+  
+  const { data, error } = await query.order('name');
   
   if (error) throw error;
   return data;
 }
 
-export async function getAgentBySessionKey(sessionKey: string) {
-  const { data, error } = await supabase
+export async function getAgentBySessionKey(sessionKey: string, tenantId?: string) {
+  let query = supabase
     .from('agents')
     .select('*')
-    .eq('session_key', sessionKey)
-    .single();
+    .eq('session_key', sessionKey);
+  
+  if (tenantId) {
+    query = query.eq('tenant_id', tenantId);
+  }
+  
+  const { data, error } = await query.single();
   
   if (error && error.code !== 'PGRST116') throw error;
   return data;
@@ -28,6 +38,7 @@ export async function createAgent(params: {
   role: string;
   sessionKey: string;
   level: 'intern' | 'specialist' | 'lead';
+  tenantId: string;
 }) {
   const { data, error } = await supabase
     .from('agents')
@@ -37,7 +48,8 @@ export async function createAgent(params: {
       session_key: params.sessionKey,
       level: params.level,
       status: 'idle',
-      last_heartbeat: Date.now()
+      last_heartbeat: Date.now(),
+      tenant_id: params.tenantId
     })
     .select()
     .single();

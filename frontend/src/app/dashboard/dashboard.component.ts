@@ -6,6 +6,7 @@ import { MissionQueueComponent } from '../components/mission-queue/mission-queue
 import { LiveFeedComponent } from '../components/live-feed/live-feed.component';
 import { ProposalsComponent } from '../components/proposals/proposals.component';
 import { QuickStatsComponent } from '../components/quick-stats/quick-stats.component';
+import { ChatComponent } from '../components/chat/chat.component';
 
 @Component({
   selector: 'app-dashboard',
@@ -17,10 +18,21 @@ import { QuickStatsComponent } from '../components/quick-stats/quick-stats.compo
     MissionQueueComponent,
     LiveFeedComponent,
     ProposalsComponent,
-    QuickStatsComponent
+    QuickStatsComponent,
+    ChatComponent
   ],
   templateUrl: './dashboard.component.html',
   styleUrl: './dashboard.component.scss',
   changeDetection: ChangeDetectionStrategy.OnPush
 })
-export class DashboardComponent {}
+export class DashboardComponent {
+  showChat = false;
+
+  onChatClick(): void {
+    this.showChat = !this.showChat;
+  }
+
+  onChatClose(): void {
+    this.showChat = false;
+  }
+}

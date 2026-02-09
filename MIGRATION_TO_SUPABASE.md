@@ -122,8 +122,19 @@ If you have existing data in Convex, you'll need to export it and import into Su
 4. **Type Safety**: Better TypeScript integration with generated types
 5. **Control**: Full database access, custom functions, triggers
 
+## Post-Migration Features
+
+After the initial migration, the following features have been added:
+
+- **Multi-Tenant Support**: Full tenant isolation with `tenant_id` on all tables
+- **Chat System**: Real-time messaging via chat threads
+- **Enhanced Activities**: Event tags and originator tracking for better event visibility
+
+See [IMPLEMENTATION_PLAN.md](./IMPLEMENTATION_PLAN.md) for details on these features.
+
 ## Notes
 
 - Real-time subscriptions are now native Supabase subscriptions (no polling needed)
 - RLS policies are enabled but currently allow all operations (can be restricted later)
 - All timestamps are stored as BIGINT (milliseconds since epoch) for consistency
+- Multi-tenant support is fully implemented with tenant context management

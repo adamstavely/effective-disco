@@ -80,6 +80,8 @@ export async function createProposal(params: {
       agent_id: null,
       task_id: null,
       message: `Proposal "${params.title}" created by ${params.source}`,
+      event_tag: 'creation',
+      originator: params.source,
       created_at: now
     });
   

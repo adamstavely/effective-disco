@@ -41,16 +41,25 @@ export class DocumentConversationTrayComponent implements OnChanges {
     );
 
     // Combine messages with agent names
+    // Note: Document messages are task messages, so they should always have fromAgentId
     this.messagesWithAgents$ = combineLatest([
       this.messages$,
       this.agents$
     ]).pipe(
       map(([messages, agents]) => {
         return messages.map(msg => {
+          // For task messages, fromAgentId should always be set
+          // But handle null case just in case
+          if (!msg.fromAgentId) {
+            return {
+              ...msg,
+              agentName: 'Unknown'
+            };
+          }
           const agent = agents.find(a => a._id === msg.fromAgentId);
           return {
             ...msg,
-            agentName: agent?.name || msg.fromAgentId
+            agentName: agent?.name || msg.fromAgentId || 'Unknown'
           };
         });
       })

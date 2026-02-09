@@ -1,0 +1,385 @@
+@import '../../../styles/tokens';
+
+.chat-container {
+  display: flex;
+  height: 100%;
+  background: var(--color-neutral-0);
+}
+
+.chat-sidebar {
+  width: 300px;
+  border-right: var(--border-width) var(--border-style) var(--border-color);
+  display: flex;
+  flex-direction: column;
+  background: var(--color-neutral-50);
+  flex-shrink: 0;
+}
+
+.sidebar-header {
+  padding: var(--spacing-4);
+  border-bottom: var(--border-width) var(--border-style) var(--border-color);
+  background: var(--color-neutral-0);
+}
+
+.sidebar-title {
+  font-size: var(--font-size-lg);
+  font-weight: var(--font-weight-semibold);
+  color: var(--color-neutral-900);
+  margin: 0 0 var(--spacing-3) 0;
+}
+
+.new-thread-btn {
+  width: 100%;
+  padding: var(--spacing-2) var(--spacing-3);
+  background: var(--color-primary-500);
+  color: var(--color-neutral-0);
+  border: none;
+  border-radius: var(--radius-md);
+  font-size: var(--font-size-sm);
+  font-weight: var(--font-weight-semibold);
+  cursor: pointer;
+  transition: all var(--transition-fast);
+
+  &:hover {
+    background: var(--color-primary-600);
+  }
+
+  &:active {
+    transform: scale(0.98);
+  }
+}
+
+.agent-selector {
+  padding: var(--spacing-4);
+  border-bottom: var(--border-width) var(--border-style) var(--border-color);
+  background: var(--color-neutral-0);
+
+  label {
+    display: block;
+    font-size: var(--font-size-xs);
+    font-weight: var(--font-weight-semibold);
+    color: var(--color-neutral-600);
+    margin-bottom: var(--spacing-2);
+    text-transform: uppercase;
+    letter-spacing: var(--letter-spacing-tight);
+  }
+
+  .agent-select {
+    width: 100%;
+    padding: var(--spacing-2) var(--spacing-3);
+    border: var(--border-width) var(--border-style) var(--border-color);
+    border-radius: var(--radius-md);
+    font-size: var(--font-size-sm);
+    background: var(--color-neutral-0);
+    color: var(--color-neutral-700);
+    cursor: pointer;
+
+    &:hover {
+      border-color: var(--color-neutral-500);
+    }
+
+    &:focus {
+      outline: none;
+      border-color: var(--color-primary-500);
+    }
+  }
+}
+
+.threads-list {
+  flex: 1;
+  overflow-y: auto;
+  padding: var(--spacing-2);
+}
+
+.thread-item {
+  padding: var(--spacing-3);
+  margin-bottom: var(--spacing-2);
+  background: var(--color-neutral-0);
+  border: var(--border-width) var(--border-style) var(--border-color);
+  border-radius: var(--radius-md);
+  cursor: pointer;
+  transition: all var(--transition-fast);
+
+  &:hover {
+    border-color: var(--color-neutral-500);
+    box-shadow: var(--shadow-sm);
+  }
+
+  &.selected {
+    border-color: var(--color-primary-500);
+    background: var(--color-primary-50);
+  }
+}
+
+.thread-title {
+  font-weight: var(--font-weight-semibold);
+  font-size: var(--font-size-sm);
+  color: var(--color-neutral-900);
+  margin-bottom: var(--spacing-1);
+}
+
+.thread-meta {
+  font-size: var(--font-size-xs);
+  color: var(--color-neutral-600);
+}
+
+.empty-state {
+  padding: var(--spacing-4);
+  text-align: center;
+  color: var(--color-neutral-500);
+
+  p {
+    margin: 0 0 var(--spacing-2) 0;
+    font-size: var(--font-size-sm);
+  }
+
+  .empty-hint {
+    font-size: var(--font-size-xs);
+    color: var(--color-neutral-500);
+  }
+}
+
+.chat-main {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  background: var(--color-neutral-0);
+}
+
+.chat-messages-container {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+}
+
+.messages-list {
+  flex: 1;
+  overflow-y: auto;
+  padding: var(--spacing-4);
+  display: flex;
+  flex-direction: column;
+  gap: var(--spacing-4);
+}
+
+.message-item {
+  display: flex;
+  flex-direction: column;
+  gap: var(--spacing-2);
+
+  &.user-message {
+    align-items: flex-end;
+
+    .message-content {
+      padding-left: 0;
+      padding-right: calc(32px + var(--spacing-2));
+      background: var(--color-primary-50);
+      padding: var(--spacing-2) var(--spacing-3);
+      border-radius: var(--radius-md);
+      max-width: 80%;
+    }
+
+    .message-header {
+      flex-direction: row-reverse;
+    }
+  }
+
+  &.agent-message {
+    align-items: flex-start;
+
+    .message-content {
+      background: var(--color-neutral-50);
+      padding: var(--spacing-2) var(--spacing-3);
+      border-radius: var(--radius-md);
+      max-width: 80%;
+    }
+  }
+}
+
+.message-header {
+  display: flex;
+  align-items: center;
+  gap: var(--spacing-2);
+}
+
+.message-avatar {
+  width: 32px;
+  height: 32px;
+  min-width: 32px;
+  border-radius: var(--radius-full);
+  background: var(--color-neutral-200);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  overflow: hidden;
+  flex-shrink: 0;
+
+  img {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+  }
+
+  .avatar-initial {
+    font-weight: var(--font-weight-semibold);
+    font-size: var(--font-size-sm);
+    color: var(--color-neutral-600);
+    line-height: 1;
+  }
+}
+
+.message-info {
+  display: flex;
+  flex-direction: column;
+  gap: var(--spacing-1);
+  flex: 1;
+}
+
+.message-agent,
+.message-sender {
+  font-weight: var(--font-weight-semibold);
+  font-size: var(--font-size-sm);
+  color: var(--color-neutral-900);
+}
+
+.message-time {
+  font-size: var(--font-size-xs);
+  color: var(--color-neutral-600);
+}
+
+.message-content {
+  font-size: var(--font-size-sm);
+  line-height: var(--line-height-relaxed);
+  color: var(--color-neutral-700);
+
+  // Markdown styles
+  :deep(p) {
+    margin: 0 0 var(--spacing-2) 0;
+    
+    &:last-child {
+      margin-bottom: 0;
+    }
+  }
+
+  :deep(code) {
+    background: var(--color-neutral-100);
+    padding: var(--spacing-1);
+    border-radius: var(--radius-sm);
+    font-family: 'Courier New', monospace;
+    font-size: var(--font-size-xs);
+  }
+
+  :deep(pre) {
+    background: var(--color-neutral-100);
+    padding: var(--spacing-2);
+    border-radius: var(--radius-sm);
+    overflow-x: auto;
+    margin-bottom: var(--spacing-2);
+  }
+
+  :deep(strong) {
+    font-weight: var(--font-weight-semibold);
+  }
+
+  :deep(em) {
+    font-style: italic;
+  }
+
+  :deep(ul), :deep(ol) {
+    margin: var(--spacing-2) 0;
+    padding-left: var(--spacing-4);
+  }
+
+  :deep(li) {
+    margin: var(--spacing-1) 0;
+  }
+
+  :deep(blockquote) {
+    border-left: 3px solid var(--color-primary-500);
+    padding-left: var(--spacing-3);
+    margin-left: 0;
+    margin-bottom: var(--spacing-2);
+    color: var(--color-neutral-600);
+    font-style: italic;
+  }
+
+  :deep(a) {
+    color: var(--color-primary-600);
+    text-decoration: none;
+
+    &:hover {
+      text-decoration: underline;
+    }
+  }
+}
+
+.message-input-container {
+  padding: var(--spacing-4);
+  border-top: var(--border-width) var(--border-style) var(--border-color);
+  background: var(--color-neutral-50);
+  display: flex;
+  gap: var(--spacing-3);
+  flex-shrink: 0;
+}
+
+.message-input {
+  flex: 1;
+  padding: var(--spacing-3);
+  border: var(--border-width) var(--border-style) var(--border-color);
+  border-radius: var(--radius-md);
+  font-size: var(--font-size-sm);
+  font-family: var(--font-family-base);
+  resize: none;
+  background: var(--color-neutral-0);
+  color: var(--color-neutral-700);
+
+  &:focus {
+    outline: none;
+    border-color: var(--color-primary-500);
+  }
+
+  &::placeholder {
+    color: var(--color-neutral-500);
+  }
+}
+
+.send-button {
+  padding: var(--spacing-3) var(--spacing-5);
+  background: var(--color-primary-500);
+  color: var(--color-neutral-0);
+  border: none;
+  border-radius: var(--radius-md);
+  font-size: var(--font-size-sm);
+  font-weight: var(--font-weight-semibold);
+  cursor: pointer;
+  transition: all var(--transition-fast);
+  align-self: flex-end;
+
+  &:hover:not(:disabled) {
+    background: var(--color-primary-600);
+  }
+
+  &:active:not(:disabled) {
+    transform: scale(0.98);
+  }
+
+  &:disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
+  }
+}
+
+.no-thread-selected {
+  flex: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--color-neutral-500);
+  font-size: var(--font-size-sm);
+  text-align: center;
+  padding: var(--spacing-4);
+
+  p {
+    margin: 0;
+  }
+}

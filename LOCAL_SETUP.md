@@ -41,11 +41,19 @@ supabase start
 The schema will be automatically applied when you start Supabase, or you can run it manually:
 
 ```bash
-# Using Supabase CLI
+# Using Supabase CLI (applies schema.sql automatically)
 supabase db reset
 
 # Or manually via psql
 psql postgresql://postgres:postgres@127.0.0.1:54322/postgres -f backend/supabase/schema.sql
+```
+
+**Note**: If you have existing data and need to apply migrations (e.g., multi-tenant support, activity event fields), run the migration files:
+
+```bash
+# Apply migrations in order
+psql postgresql://postgres:postgres@127.0.0.1:54322/postgres -f backend/supabase/migrations/add_multi_tenant_support.sql
+psql postgresql://postgres:postgres@127.0.0.1:54322/postgres -f backend/supabase/migrations/add_activity_event_fields.sql
 ```
 
 ### 4. Initialize Agents

@@ -20,6 +20,7 @@
   background: var(--color-primary-500);
   margin-top: 0.3rem;
   flex-shrink: 0;
+  transition: background-color var(--transition-fast);
 }
 
 .activity-content {
@@ -29,10 +30,40 @@
   flex: 1;
 }
 
+.activity-header {
+  display: flex;
+  flex-direction: column;
+  gap: var(--spacing-1);
+}
+
 .activity-text {
   font-size: var(--font-size-md);
   color: var(--color-neutral-700);
   line-height: var(--line-height-normal);
+}
+
+.activity-meta {
+  display: flex;
+  align-items: center;
+  gap: var(--spacing-2);
+  flex-wrap: wrap;
+}
+
+.activity-tag {
+  font-size: var(--font-size-xs);
+  color: var(--color-neutral-600);
+  background: var(--color-neutral-100);
+  padding: var(--spacing-1) var(--spacing-2);
+  border-radius: var(--radius-sm);
+  font-weight: var(--font-weight-medium);
+  text-transform: uppercase;
+  letter-spacing: var(--letter-spacing-tight);
+}
+
+.activity-originator {
+  font-size: var(--font-size-xs);
+  color: var(--color-neutral-500);
+  font-style: italic;
 }
 
 .activity-time {

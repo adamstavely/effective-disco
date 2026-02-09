@@ -79,6 +79,8 @@ export async function createDocument(params: {
       agent_id: params.createdBy,
       task_id: params.taskId || null,
       message: `${agent?.name || 'Agent'} created document "${params.title}"`,
+      event_tag: 'creation',
+      originator: agent?.name || 'Agent',
       created_at: now
     });
   

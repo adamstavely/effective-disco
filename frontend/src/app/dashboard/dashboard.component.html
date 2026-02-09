@@ -1,10 +1,16 @@
 <div class="dashboard">
-  <app-top-nav></app-top-nav>
+  <app-top-nav (chatClick)="onChatClick()"></app-top-nav>
   <div class="dashboard-content">
     <app-agents-panel class="agents-panel"></app-agents-panel>
     <app-mission-queue class="mission-queue"></app-mission-queue>
     <app-proposals class="proposals-panel"></app-proposals>
     <app-live-feed class="live-feed"></app-live-feed>
     <app-quick-stats class="quick-stats"></app-quick-stats>
+  </div>
+  <div class="chat-overlay" *ngIf="showChat">
+    <div class="chat-overlay-backdrop" (click)="onChatClose()"></div>
+    <div class="chat-overlay-content">
+      <app-chat></app-chat>
+    </div>
   </div>
 </div>
