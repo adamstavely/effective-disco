@@ -77,4 +77,34 @@ export class TaskCardComponent {
       });
     this.archive.emit(this.task);
   }
+
+  getExecutionStateIcon(state?: string): string {
+    switch (state) {
+      case 'running':
+        return 'loader';
+      case 'paused':
+        return 'pause-circle';
+      case 'waiting_input':
+        return 'clock';
+      case 'completed':
+        return 'check-circle';
+      default:
+        return 'circle';
+    }
+  }
+
+  getExecutionStateColor(state?: string): string {
+    switch (state) {
+      case 'running':
+        return 'var(--color-status-active)';
+      case 'paused':
+        return 'var(--color-status-warning)';
+      case 'waiting_input':
+        return 'var(--color-status-warning)';
+      case 'completed':
+        return 'var(--color-status-success)';
+      default:
+        return 'var(--color-neutral-500)';
+    }
+  }
 }

@@ -1,0 +1,89 @@
+<div class="execution-steps">
+  <div class="steps-header">
+    <h3>Execution Steps</h3>
+  </div>
+  
+  <ng-container *ngIf="steps$ | async as steps; else loading">
+    <div *ngIf="steps.length > 0; else noSteps" class="steps-list">
+      <div 
+        *ngFor="let step of steps; trackBy: trackByStepId" 
+        class="step-item"
+        [class.expanded]="isStepExpanded(step._id)"
+        [class.running]="step.stepStatus === 'running'"
+        [class.completed]="step.stepStatus === 'completed'"
+        [class.failed]="step.stepStatus === 'failed'"
+      >
+        <div class="step-header" (click)="toggleStepDetails(step._id)">
+          <div class="step-indicator">
+            <lucide-icon 
+              [name]="getStepStatusIcon(step.stepStatus)" 
+              [size]="16"
+              [style.color]="getStepStatusColor(step.stepStatus)"
+              [class.spinning]="step.stepStatus === 'running'"
+            ></lucide-icon>
+          </div>
+          <div class="step-content">
+            <div class="step-message">{{ step.message }}</div>
+            <div class="step-meta">
+              <span class="step-status" [style.color]="getStepStatusColor(step.stepStatus)">
+                {{ getStepStatusLabel(step.stepStatus) }}
+              </span>
+              <span class="step-time">{{ step.createdAt | timeAgo }}</span>
+              <span *ngIf="step.stepDetails?.toolName" class="step-tool">
+                {{ step.stepDetails?.toolName }}
+              </span>
+            </div>
+          </div>
+          <div class="step-actions">
+            <lucide-icon 
+              [name]="isStepExpanded(step._id) ? 'chevron-up' : 'chevron-down'" 
+              [size]="16"
+              class="expand-icon"
+            ></lucide-icon>
+          </div>
+        </div>
+        
+        <div *ngIf="isStepExpanded(step._id)" class="step-details">
+          <div *ngIf="step.stepDetails" class="details-content">
+            <div *ngIf="step.stepDetails.toolName" class="detail-row">
+              <span class="detail-label">Tool:</span>
+              <span class="detail-value">{{ step.stepDetails.toolName }}</span>
+            </div>
+            <div *ngIf="step.stepDetails.duration" class="detail-row">
+              <span class="detail-label">Duration:</span>
+              <span class="detail-value">{{ step.stepDetails.duration }}ms</span>
+            </div>
+            <div *ngIf="step.stepDetails.input" class="detail-row">
+              <span class="detail-label">Input:</span>
+              <pre class="detail-value code">{{ formatJson(step.stepDetails.input) }}</pre>
+            </div>
+            <div *ngIf="step.stepDetails.output" class="detail-row">
+              <span class="detail-label">Output:</span>
+              <pre class="detail-value code">{{ formatJson(step.stepDetails.output) }}</pre>
+            </div>
+            <div *ngIf="step.stepDetails.error" class="detail-row error">
+              <span class="detail-label">Error:</span>
+              <pre class="detail-value code error">{{ step.stepDetails.error }}</pre>
+            </div>
+          </div>
+          <div *ngIf="!step.stepDetails" class="no-details">
+            No additional details available
+          </div>
+        </div>
+      </div>
+    </div>
+    
+    <ng-template #noSteps>
+      <div class="empty-state">
+        <p>No execution steps yet</p>
+      </div>
+    </ng-template>
+  </ng-container>
+  
+  <ng-template #loading>
+    <div class="loading-state">
+      <lucide-icon name="loader" [size]="20" class="spinning"></lucide-icon>
+      <span>Loading steps...</span>
+    </div>
+  </ng-template>
+</div>

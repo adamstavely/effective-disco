@@ -113,11 +113,39 @@
   margin-bottom: var(--spacing-2);
 }
 
+.task-title-row {
+  display: flex;
+  align-items: center;
+  gap: var(--spacing-2);
+  flex: 1;
+}
+
 .task-title {
   font-weight: var(--font-weight-semibold);
   font-size: var(--font-size-lg);
   color: var(--color-neutral-700);
   flex: 1;
+}
+
+.execution-state-indicator {
+  display: flex;
+  align-items: center;
+  flex-shrink: 0;
+
+  lucide-icon {
+    &.spinning {
+      animation: spin 1s linear infinite;
+    }
+  }
+}
+
+@keyframes spin {
+  from {
+    transform: rotate(0deg);
+  }
+  to {
+    transform: rotate(360deg);
+  }
 }
 
 .priority-badge {

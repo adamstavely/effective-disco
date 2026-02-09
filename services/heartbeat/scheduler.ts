@@ -64,6 +64,26 @@ async function executeHeartbeat(agentSchedule: AgentSchedule): Promise<void> {
     // Check for assigned tasks
     const assignedTasks = await tasksFunctions.getTasksByAssignee(dbAgent.id);
 
+    // Filter out paused tasks
+    const activeTasks = [];
+    for (const task of assignedTasks) {
+      try {
+        const { data: taskData } = await supabase
+          .from('tasks')
+          .select('execution_state')
+          .eq('id', task._id || task.id)
+          .single();
+        
+        // Skip paused tasks
+        if (taskData?.execution_state !== 'paused') {
+          activeTasks.push(task);
+        }
+      } catch (e) {
+        // If we can't check state, include the task
+        activeTasks.push(task);
+      }
+    }
+
     // Build heartbeat message
     let heartbeatMessage = `You are ${agentSchedule.name}, the ${dbAgent.role}. `;
     heartbeatMessage += `Check Mission Control for new tasks and notifications.\n\n`;
@@ -78,18 +98,41 @@ async function executeHeartbeat(agentSchedule: AgentSchedule): Promise<void> {
       heartbeatMessage += "\n\n";
     }
 
-    if (assignedTasks.length > 0) {
-      heartbeatMessage += `You have ${assignedTasks.length} assigned task(s). `;
+    if (activeTasks.length > 0) {
+      heartbeatMessage += `You have ${activeTasks.length} assigned task(s). `;
       heartbeatMessage += `Review them and start working if needed.\n\n`;
+      
+      // If there's a task in progress, use step tracking
+      const inProgressTask = activeTasks.find(t => t.status === 'in_progress');
+      if (inProgressTask) {
+        const taskId = inProgressTask._id || inProgressTask.id;
+        // Execute with step tracking for in-progress tasks
+        const response = await agent.execute(heartbeatMessage, taskId, dbAgent.id);
+        
+        // Update agent status
+        const isActive = !response.includes("HEARTBEAT_OK");
+        await agentsFunctions.updateAgentStatus(
+          dbAgent.id,
+          isActive ? "active" : "idle"
+        );
+
+        // Mark notifications as delivered
+        if (notifications.length > 0) {
+          await notificationsFunctions.markAllNotificationsDelivered(dbAgent.id);
+        }
+
+        console.log(`[${new Date().toISOString()}] Heartbeat complete: ${agentSchedule.name} - ${response.substring(0, 100)}`);
+        return;
+      }
     }
 
-    if (!workingContent.includes("None") || notifications.length > 0 || assignedTasks.length > 0) {
+    if (!workingContent.includes("None") || notifications.length > 0 || activeTasks.length > 0) {
       heartbeatMessage += "Take action on the above. Otherwise, reply with HEARTBEAT_OK.";
     } else {
       heartbeatMessage += "If there's no work, reply with HEARTBEAT_OK.";
     }
 
-    // Execute heartbeat
+    // Execute heartbeat (standard execution, no step tracking)
     const response = await agent.execute(heartbeatMessage);
 
     // Update agent status

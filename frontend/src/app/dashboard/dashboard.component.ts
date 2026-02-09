@@ -5,7 +5,6 @@ import { AgentsPanelComponent } from '../components/agents-panel/agents-panel.co
 import { MissionQueueComponent } from '../components/mission-queue/mission-queue.component';
 import { LiveFeedComponent } from '../components/live-feed/live-feed.component';
 import { ProposalsComponent } from '../components/proposals/proposals.component';
-import { QuickStatsComponent } from '../components/quick-stats/quick-stats.component';
 import { ChatComponent } from '../components/chat/chat.component';
 
 @Component({
@@ -18,7 +17,6 @@ import { ChatComponent } from '../components/chat/chat.component';
     MissionQueueComponent,
     LiveFeedComponent,
     ProposalsComponent,
-    QuickStatsComponent,
     ChatComponent
   ],
   templateUrl: './dashboard.component.html',

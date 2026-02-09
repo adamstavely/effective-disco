@@ -20,7 +20,11 @@ export const ACTIVITY_TYPE_LABELS: Record<ActivityType | 'all', string> = {
   proposal_created: 'Proposals',
   proposal_approved: 'Proposals',
   proposal_rejected: 'Proposals',
-  proposal_converted: 'Proposals'
+  proposal_converted: 'Proposals',
+  execution_step: 'Execution',
+  execution_paused: 'Execution',
+  execution_resumed: 'Execution',
+  execution_interrupted: 'Execution'
 };
 
 export const TASK_STATUS_COLORS: Record<TaskStatus, string> = {

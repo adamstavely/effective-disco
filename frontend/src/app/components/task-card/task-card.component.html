@@ -18,7 +18,17 @@
   </div>
   <div class="task-content">
     <div class="task-header">
-      <div class="task-title">{{ task.title }}</div>
+      <div class="task-title-row">
+        <div class="task-title">{{ task.title }}</div>
+        <div class="execution-state-indicator" *ngIf="task.executionState && task.executionState !== 'idle'">
+          <lucide-icon 
+            [name]="getExecutionStateIcon(task.executionState)" 
+            [size]="12"
+            [style.color]="getExecutionStateColor(task.executionState)"
+            [class.spinning]="task.executionState === 'running'"
+          ></lucide-icon>
+        </div>
+      </div>
       <div class="priority-badge" [class.priority-high]="task.priority === 'high'" 
            [class.priority-medium]="task.priority === 'medium'" 
            [class.priority-low]="task.priority === 'low'">

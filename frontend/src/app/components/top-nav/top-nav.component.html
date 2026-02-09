@@ -11,6 +11,18 @@
       <span class="stat-value">{{ tasksInQueue$ | async }}</span>
       <span class="stat-label">TASKS IN QUEUE</span>
     </div>
+    <div class="stat">
+      <span class="stat-value">{{ proposalsToday$ | async }}</span>
+      <span class="stat-label">PROPOSALS TODAY</span>
+    </div>
+    <div class="stat">
+      <span class="stat-value">{{ missionsCompleted$ | async }}</span>
+      <span class="stat-label">TASKS COMPLETED</span>
+    </div>
+    <div class="stat">
+      <span class="stat-value">{{ successRate$ | async }}%</span>
+      <span class="stat-label">SUCCESS RATE</span>
+    </div>
   </div>
   <div class="nav-right">
     <app-tenant-selector></app-tenant-selector>

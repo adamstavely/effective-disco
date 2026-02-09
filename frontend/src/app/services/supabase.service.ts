@@ -2106,7 +2106,11 @@ export class SupabaseService {
       tags: task.tags || [],
       borderColor: task.border_color,
       startedAt: task.started_at,
-      lastMessageAt: task.last_message_at
+      lastMessageAt: task.last_message_at,
+      executionState: task.execution_state || 'idle',
+      executionPausedAt: task.execution_paused_at,
+      executionResumedAt: task.execution_resumed_at,
+      currentStepId: task.current_step_id
     }));
   }
 
@@ -2124,7 +2128,11 @@ export class SupabaseService {
       tags: task.tags || [],
       borderColor: task.border_color,
       startedAt: task.started_at,
-      lastMessageAt: task.last_message_at
+      lastMessageAt: task.last_message_at,
+      executionState: task.execution_state || 'idle',
+      executionPausedAt: task.execution_paused_at,
+      executionResumedAt: task.execution_resumed_at,
+      currentStepId: task.current_step_id
     };
   }
 
@@ -2155,7 +2163,10 @@ export class SupabaseService {
       message: activity.message,
       eventTag: activity.event_tag,
       originator: activity.originator,
-      createdAt: activity.created_at
+      createdAt: activity.created_at,
+      stepDetails: activity.step_details,
+      stepStatus: activity.step_status,
+      stepOrder: activity.step_order
     }));
   }
 
@@ -2282,6 +2293,212 @@ export class SupabaseService {
         .then(res => res.json())
         .then(data => data.files || [])
         .catch(() => [])
+    );
+  }
+
+  // Execution tracking methods
+  getTaskExecutionSteps(taskId: string): Observable<Activity[]> {
+    if (!this.client) return new BehaviorSubject<Activity[]>([]).asObservable();
+    
+    const tenantId = this.getTenantId();
+    const channel = this.getChannel(`execution-steps-${tenantId}-${taskId}`);
+    
+    return new Observable(observer => {
+      // Initial fetch
+      Promise.resolve(this.client!.from('activities')
+        .select('*')
+        .eq('task_id', taskId)
+        .eq('type', 'execution_step')
+        .eq('tenant_id', tenantId)
+        .order('step_order', { ascending: true }))
+        .then(({ data, error }) => {
+          if (error) {
+            console.error('Error fetching execution steps:', error);
+            observer.next([]);
+            return;
+          }
+          observer.next(this.transformActivities(data || []));
+        })
+        .catch(err => {
+          console.error('Error in execution steps query:', err);
+          observer.next([]);
+        });
+      
+      // Subscribe to changes
+      const subscription = channel
+        .on('postgres_changes',
+          { 
+            event: '*', 
+            schema: 'public', 
+            table: 'activities', 
+            filter: `task_id=eq.${taskId} AND type=eq.execution_step AND tenant_id=eq.${tenantId}` 
+          },
+          () => {
+            Promise.resolve(this.client!.from('activities')
+              .select('*')
+              .eq('task_id', taskId)
+              .eq('type', 'execution_step')
+              .eq('tenant_id', tenantId)
+              .order('step_order', { ascending: true }))
+              .then(({ data, error }) => {
+                if (error) {
+                  console.error('Error refetching execution steps:', error);
+                  return;
+                }
+                if (data) observer.next(this.transformActivities(data));
+              })
+              .catch(err => {
+                console.error('Error in execution steps refetch:', err);
+              });
+          }
+        )
+        .subscribe();
+      
+      return () => {
+        subscription.unsubscribe();
+      };
+    });
+  }
+
+  getTaskExecutionState(taskId: string): Observable<string> {
+    if (!this.client) return new BehaviorSubject<string>('idle').asObservable();
+    
+    const tenantId = this.getTenantId();
+    const channel = this.getChannel(`execution-state-${tenantId}-${taskId}`);
+    
+    return new Observable(observer => {
+      // Initial fetch
+      Promise.resolve(this.client!.from('tasks')
+        .select('execution_state')
+        .eq('id', taskId)
+        .eq('tenant_id', tenantId)
+        .single())
+        .then(({ data, error }) => {
+          if (error) {
+            console.error('Error fetching execution state:', error);
+            observer.next('idle');
+            return;
+          }
+          observer.next(data?.execution_state || 'idle');
+        })
+        .catch(err => {
+          console.error('Error in execution state query:', err);
+          observer.next('idle');
+        });
+      
+      // Subscribe to changes
+      const subscription = channel
+        .on('postgres_changes',
+          { 
+            event: 'UPDATE', 
+            schema: 'public', 
+            table: 'tasks', 
+            filter: `id=eq.${taskId} AND tenant_id=eq.${tenantId}` 
+          },
+          (payload: any) => {
+            if (payload.new?.execution_state) {
+              observer.next(payload.new.execution_state);
+            }
+          }
+        )
+        .subscribe();
+      
+      return () => {
+        subscription.unsubscribe();
+      };
+    });
+  }
+
+  pauseTaskExecution(taskId: string): Promise<void> {
+    if (!this.client) return Promise.reject(new Error('Supabase client not initialized'));
+    
+    const tenantId = this.getTenantId();
+    const now = Date.now();
+    
+    return Promise.resolve(
+      this.client.from('tasks')
+        .update({ execution_state: 'paused', execution_paused_at: now })
+        .eq('id', taskId)
+        .eq('tenant_id', tenantId)
+        .then(({ error }) => {
+          if (error) throw error;
+          // Create activity entry
+          return this.client!.from('activities').insert({
+            type: 'execution_paused',
+            agent_id: null,
+            task_id: taskId,
+            tenant_id: tenantId,
+            message: 'Task execution paused',
+            event_tag: 'execution',
+            originator: 'User',
+            created_at: now
+          });
+        })
+        .then(({ error }) => {
+          if (error) console.error('Error creating pause activity:', error);
+        })
+    );
+  }
+
+  resumeTaskExecution(taskId: string): Promise<void> {
+    if (!this.client) return Promise.reject(new Error('Supabase client not initialized'));
+    
+    const tenantId = this.getTenantId();
+    const now = Date.now();
+    
+    return Promise.resolve(
+      this.client.from('tasks')
+        .update({ execution_state: 'running', execution_resumed_at: now })
+        .eq('id', taskId)
+        .eq('tenant_id', tenantId)
+        .then(({ error }) => {
+          if (error) throw error;
+          // Create activity entry
+          return this.client!.from('activities').insert({
+            type: 'execution_resumed',
+            agent_id: null,
+            task_id: taskId,
+            tenant_id: tenantId,
+            message: 'Task execution resumed',
+            event_tag: 'execution',
+            originator: 'User',
+            created_at: now
+          });
+        })
+        .then(({ error }) => {
+          if (error) console.error('Error creating resume activity:', error);
+        })
+    );
+  }
+
+  interruptTaskExecution(taskId: string, reason?: string): Promise<void> {
+    if (!this.client) return Promise.reject(new Error('Supabase client not initialized'));
+    
+    const tenantId = this.getTenantId();
+    const now = Date.now();
+    
+    return Promise.resolve(
+      this.client.from('tasks')
+        .update({ execution_state: 'idle' })
+        .eq('id', taskId)
+        .eq('tenant_id', tenantId)
+        .then(({ error }) => {
+          if (error) throw error;
+          // Create activity entry
+          return this.client!.from('activities').insert({
+            type: 'execution_interrupted',
+            agent_id: null,
+            task_id: taskId,
+            tenant_id: tenantId,
+            message: reason || 'Task execution interrupted',
+            event_tag: 'execution',
+            originator: 'User',
+            created_at: now
+          });
+        })
+        .then(({ error }) => {
+          if (error) console.error('Error creating interrupt activity:', error);
+        })
     );
   }
 }

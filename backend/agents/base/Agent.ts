@@ -12,6 +12,8 @@ import * as tasksFunctions from "../../supabase/functions/tasks";
 import * as messagesFunctions from "../../supabase/functions/messages";
 import * as documentsFunctions from "../../supabase/functions/documents";
 import * as notificationsFunctions from "../../supabase/functions/notifications";
+import * as executionFunctions from "../../supabase/functions/execution";
+import { ExecutionCallbackHandler } from "./ExecutionCallbackHandler";
 
 export interface AgentConfig {
   name: string;
@@ -27,6 +29,7 @@ export class Agent {
   private config: AgentConfig;
   private executor?: AgentExecutor;
   private sessionHistory: Array<{ role: string; content: string }> = [];
+  private currentTaskId: string | null = null;
 
   constructor(config: AgentConfig) {
     this.config = config;
@@ -68,7 +71,135 @@ export class Agent {
       agent,
       tools,
       verbose: true,
+      returnIntermediateSteps: false,
     });
+  }
+
+  /**
+   * Execute with step tracking for a specific task
+   */
+  async executeWithStepTracking(input: string, taskId: string, agentId?: string | null): Promise<string> {
+    this.currentTaskId = taskId;
+    
+    // Get agent ID if not provided
+    let resolvedAgentId = agentId;
+    if (!resolvedAgentId) {
+      const agent = await agentsFunctions.getAgentBySessionKey(this.config.sessionKey);
+      resolvedAgentId = agent?.id || null;
+    }
+
+    // Set execution state to running
+    try {
+      await executionFunctions.checkTaskExecutionState(taskId);
+      // Update task execution state if needed
+      const supabase = getSupabaseClient();
+      await supabase.rpc('update_task_execution_state', {
+        p_task_id: taskId,
+        p_execution_state: 'running'
+      });
+    } catch (error) {
+      console.error(`Error setting execution state: ${error}`);
+    }
+
+    // Log execution start
+    try {
+      await executionFunctions.logExecutionStep(
+        taskId,
+        resolvedAgentId,
+        {
+          message: `Starting execution: ${input.substring(0, 100)}...`
+        },
+        'running'
+      );
+    } catch (error) {
+      console.error(`Error logging execution start: ${error}`);
+    }
+
+    // Create callback handler
+    const callbackHandler = new ExecutionCallbackHandler({
+      taskId,
+      agentId: resolvedAgentId
+    });
+
+    // Execute with callbacks
+    if (!this.executor) {
+      await this.initialize();
+    }
+
+    try {
+      const result = await this.executor!.invoke(
+        {
+          input,
+          chat_history: this.sessionHistory,
+        },
+        {
+          callbacks: [callbackHandler]
+        }
+      );
+
+      // Log execution end
+      try {
+        await executionFunctions.logExecutionStep(
+          taskId,
+          resolvedAgentId,
+          {
+            message: "Execution completed",
+            output: result.output?.substring(0, 500) || ""
+          },
+          'completed'
+        );
+      } catch (error) {
+        console.error(`Error logging execution end: ${error}`);
+      }
+
+      // Update execution state to completed
+      try {
+        const supabase = getSupabaseClient();
+        await supabase.rpc('update_task_execution_state', {
+          p_task_id: taskId,
+          p_execution_state: 'completed'
+        });
+      } catch (error) {
+        console.error(`Error updating execution state: ${error}`);
+      }
+
+      // Save to session history
+      this.sessionHistory.push({ role: "human", content: input });
+      this.sessionHistory.push({ role: "assistant", content: result.output });
+      await this.saveSessionHistory();
+
+      return result.output;
+    } catch (error: any) {
+      // Log execution error
+      try {
+        await executionFunctions.logExecutionStep(
+          taskId,
+          resolvedAgentId,
+          {
+            message: "Execution failed",
+            error: error.message || String(error)
+          },
+          'failed'
+        );
+      } catch (logError) {
+        console.error(`Error logging execution error: ${logError}`);
+      }
+
+      // Update execution state to idle on error
+      try {
+        const supabase = getSupabaseClient();
+        await supabase.rpc('update_task_execution_state', {
+          p_task_id: taskId,
+          p_execution_state: 'idle'
+        });
+      } catch (stateError) {
+        console.error(`Error updating execution state: ${stateError}`);
+      }
+
+      throw error;
+    } finally {
+      this.currentTaskId = null;
+    }
   }
 
   private createLLM() {
@@ -276,7 +407,13 @@ export class Agent {
     ];
   }
 
-  async execute(input: string): Promise<string> {
+  async execute(input: string, taskId?: string, agentId?: string | null): Promise<string> {
+    // If taskId is provided, use step tracking
+    if (taskId) {
+      return this.executeWithStepTracking(input, taskId, agentId);
+    }
+
+    // Otherwise, use standard execution
     if (!this.executor) {
       await this.initialize();
     }
@@ -292,6 +429,55 @@ export class Agent {
     await this.saveSessionHistory();
 
     return result.output;
+  }
+
+  /**
+   * Check if task execution is paused
+   */
+  async checkPauseState(taskId: string): Promise<boolean> {
+    try {
+      const state = await executionFunctions.checkTaskExecutionState(taskId);
+      return state === 'paused';
+    } catch (error) {
+      console.error(`Error checking pause state: ${error}`);
+      return false; // Default to not paused if check fails
+    }
+  }
+
+  /**
+   * Wait for task to be resumed (with timeout)
+   */
+  async waitForResume(taskId: string, timeoutMs: number = 30000): Promise<void> {
+    const startTime = Date.now();
+    const pollInterval = 1000; // Check every second
+
+    while (Date.now() - startTime < timeoutMs) {
+      const state = await executionFunctions.checkTaskExecutionState(taskId);
+      if (state === 'running') {
+        return; // Resumed
+      }
+      if (state === 'idle') {
+        throw new Error('Task execution was interrupted');
+      }
+      // Still paused, wait and check again
+      await new Promise(resolve => setTimeout(resolve, pollInterval));
+    }
+
+    throw new Error('Timeout waiting for task resume');
+  }
+
+  /**
+   * Log a step manually (helper method)
+   */
+  private async logStep(taskId: string, stepData: executionFunctions.ExecutionStepData): Promise<void> {
+    try {
+      const agent = await agentsFunctions.getAgentBySessionKey(this.config.sessionKey);
+      const agentId = agent?.id || null;
+      await executionFunctions.logExecutionStep(taskId, agentId, stepData);
+    } catch (error) {
+      // Don't break execution if logging fails
+      console.error(`Error logging step: ${error}`);
+    }
   }
 
   private async loadSessionHistory(): Promise<void> {

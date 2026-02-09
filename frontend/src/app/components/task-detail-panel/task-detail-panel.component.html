@@ -227,6 +227,29 @@
       </div>
     </div>
 
+    <!-- Execution Steps (always show if there are steps, or if task is in progress/review) -->
+    <div class="section" *ngIf="(executionSteps$ | async) as steps">
+      <div *ngIf="steps.length > 0 || task.status === 'in_progress' || task.status === 'review'">
+        <div class="section-header">
+          <h3>Execution Steps</h3>
+          <div class="execution-state-badge" *ngIf="(executionState$ | async) as state">
+            <span class="state-dot" [style.background-color]="getExecutionStateColor(state)"></span>
+            <span>{{ getExecutionStateLabel(state) }}</span>
+          </div>
+          <div class="execution-state-badge" *ngIf="!(executionState$ | async) && task.executionState && task.executionState !== 'idle'">
+            <span class="state-dot" [style.background-color]="getExecutionStateColor(task.executionState)"></span>
+            <span>{{ getExecutionStateLabel(task.executionState) }}</span>
+          </div>
+        </div>
+        <div class="section-content">
+          <app-execution-steps 
+            [steps$]="executionSteps$" 
+            [taskId]="task._id"
+          ></app-execution-steps>
+        </div>
+      </div>
+    </div>
+
     <!-- Quick Actions -->
     <div class="section">
       <div class="section-header">
@@ -234,6 +257,37 @@
       </div>
       <div class="section-content">
         <div class="actions-list">
+          <!-- Execution controls (only show when task is in progress and execution is active) -->
+          <ng-container *ngIf="task.status === 'in_progress' && ((executionState$ | async) || task.executionState) as state">
+            <button 
+              class="action-button pause-button" 
+              (click)="pauseExecution()" 
+              [disabled]="isPausingExecution || state !== 'running'"
+              *ngIf="state === 'running'"
+            >
+              <lucide-icon name="pause" [size]="16"></lucide-icon>
+              {{ isPausingExecution ? 'Pausing...' : 'Pause Execution' }}
+            </button>
+            <button 
+              class="action-button resume-exec-button" 
+              (click)="resumeExecution()" 
+              [disabled]="isResumingExecution || state !== 'paused'"
+              *ngIf="state === 'paused'"
+            >
+              <lucide-icon name="play" [size]="16"></lucide-icon>
+              {{ isResumingExecution ? 'Resuming...' : 'Resume Execution' }}
+            </button>
+            <button 
+              class="action-button interrupt-button" 
+              (click)="interruptExecution()" 
+              [disabled]="isInterruptingExecution"
+              *ngIf="state === 'running' || state === 'paused'"
+            >
+              <lucide-icon name="square" [size]="16"></lucide-icon>
+              {{ isInterruptingExecution ? 'Interrupting...' : 'Interrupt' }}
+            </button>
+          </ng-container>
+          
           <button class="action-button resume-button" (click)="resumeTask()" *ngIf="canResumeTask()">
             Resume Task
           </button>

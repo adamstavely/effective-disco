@@ -10,8 +10,6 @@ interface DashboardStats {
   proposalsToday: number;
   missionsCompleted: number;
   successRate: number;
-  costToday: number;
-  budgetRemaining: number;
 }
 
 @Component({
@@ -32,36 +30,22 @@ export class QuickStatsComponent {
     this.stats$ = combineLatest([
       this.supabaseService.getProposalsToday(),
       this.supabaseService.getCompletedMissions(),
-      this.supabaseService.getSuccessRate(),
-      this.supabaseService.getCostToday(),
-      this.supabaseService.getBudgetRemaining()
+      this.supabaseService.getSuccessRate()
     ]).pipe(
-      map(([proposalsToday, missionsCompleted, successRate, costToday, budgetRemaining]) => ({
+      map(([proposalsToday, missionsCompleted, successRate]) => ({
         proposalsToday,
         missionsCompleted,
-        successRate,
-        costToday,
-        budgetRemaining
+        successRate
       })),
       catchError((error) => {
         console.error('Error loading dashboard stats:', error);
         return of({
           proposalsToday: 0,
           missionsCompleted: 0,
-          successRate: 0,
-          costToday: 0,
-          budgetRemaining: 0
+          successRate: 0
         });
       })
     );
   }
 
-  formatCurrency(amount: number): string {
-    return new Intl.NumberFormat('en-US', {
-      style: 'currency',
-      currency: 'USD',
-      minimumFractionDigits: 2,
-      maximumFractionDigits: 2
-    }).format(amount);
-  }
 }

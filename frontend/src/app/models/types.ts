@@ -3,7 +3,7 @@ export type AgentLevel = "intern" | "specialist" | "lead";
 export type TaskStatus = "inbox" | "assigned" | "in_progress" | "review" | "done" | "blocked" | "archived";
 export type TaskPriority = "low" | "medium" | "high";
 export type DocumentType = "deliverable" | "research" | "protocol" | "other";
-export type ActivityType = "task_created" | "message_sent" | "document_created" | "task_assigned" | "status_changed" | "proposal_created" | "proposal_approved" | "proposal_rejected" | "proposal_converted";
+export type ActivityType = "task_created" | "message_sent" | "document_created" | "task_assigned" | "status_changed" | "proposal_created" | "proposal_approved" | "proposal_rejected" | "proposal_converted" | "execution_step" | "execution_paused" | "execution_resumed" | "execution_interrupted";
 export type ProposalStatus = "pending" | "approved" | "rejected";
 export type ProposalPriority = "low" | "medium" | "high";
 
@@ -44,6 +44,10 @@ export interface Task {
   borderColor?: string;
   startedAt?: number;
   lastMessageAt?: number;
+  executionState?: 'idle' | 'running' | 'paused' | 'waiting_input' | 'completed';
+  executionPausedAt?: number;
+  executionResumedAt?: number;
+  currentStepId?: string;
 }
 
 export interface Message {
@@ -82,6 +86,16 @@ export interface Activity {
   eventTag?: string | null;
   originator?: string | null;
   createdAt: number;
+  stepDetails?: {
+    toolName?: string;
+    input?: any;
+    output?: any;
+    duration?: number;
+    error?: string;
+    message?: string;
+  };
+  stepStatus?: 'pending' | 'running' | 'completed' | 'failed' | 'skipped';
+  stepOrder?: number;
 }
 
 export interface Document {

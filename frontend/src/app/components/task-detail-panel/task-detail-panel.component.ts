@@ -2,11 +2,12 @@ import { Component, Input, Output, EventEmitter, ChangeDetectionStrategy, Change
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { SupabaseService } from '../../services/supabase.service';
-import { Task, TaskStatus, Agent, Message, Document } from '../../models/types';
+import { Task, TaskStatus, Agent, Message, Document, Activity } from '../../models/types';
 import { TimeAgoPipe } from '../../shared/pipes/time-ago.pipe';
 import { MarkdownPipe } from '../../shared/pipes/markdown.pipe';
 import { TagComponent } from '../tag/tag.component';
 import { DocumentTraysComponent } from '../document-trays/document-trays.component';
+import { ExecutionStepsComponent } from '../execution-steps/execution-steps.component';
 import { TASK_STATUS_LABELS, TASK_STATUSES } from '../../shared/constants/app.constants';
 import { Observable, combineLatest, of, BehaviorSubject, firstValueFrom } from 'rxjs';
 import { map, switchMap, catchError } from 'rxjs/operators';
@@ -15,7 +16,7 @@ import { LucideAngularModule } from 'lucide-angular';
 @Component({
   selector: 'app-task-detail-panel',
   standalone: true,
-  imports: [CommonModule, FormsModule, TimeAgoPipe, MarkdownPipe, TagComponent, DocumentTraysComponent, LucideAngularModule],
+  imports: [CommonModule, FormsModule, TimeAgoPipe, MarkdownPipe, TagComponent, DocumentTraysComponent, ExecutionStepsComponent, LucideAngularModule],
   templateUrl: './task-detail-panel.component.html',
   styleUrl: './task-detail-panel.component.scss',
   changeDetection: ChangeDetectionStrategy.OnPush
@@ -46,6 +47,11 @@ export class TaskDetailPanelComponent implements OnChanges {
   dependentTasks$: Observable<Task[]>;
   tasksThisDependsOn$: Observable<Task[]>;
   allTasks$: Observable<Task[]>;
+  executionSteps$: Observable<Activity[]>;
+  executionState$: Observable<string>;
+  isPausingExecution = false;
+  isResumingExecution = false;
+  isInterruptingExecution = false;
 
   readonly TASK_STATUS_LABELS = TASK_STATUS_LABELS;
   readonly TASK_STATUSES = TASK_STATUSES;
@@ -145,6 +151,34 @@ export class TaskDetailPanelComponent implements OnChanges {
           );
         }
         return of([]);
+      })
+    );
+
+    // Execution steps - always load for any task (to show execution history)
+    this.executionSteps$ = this.taskSubject.pipe(
+      switchMap(task => {
+        if (task) {
+          return this.supabaseService.getTaskExecutionSteps(task._id).pipe(
+            catchError(() => of([]))
+          );
+        }
+        return of([]);
+      })
+    );
+
+    // Execution state - load for in_progress or review, otherwise use task's executionState
+    this.executionState$ = this.taskSubject.pipe(
+      switchMap(task => {
+        if (task && (task.status === 'in_progress' || task.status === 'review')) {
+          return this.supabaseService.getTaskExecutionState(task._id).pipe(
+            catchError(() => of(task.executionState || 'idle'))
+          );
+        }
+        // Return task's execution state if available, otherwise 'idle'
+        if (task && task.executionState) {
+          return of(task.executionState);
+        }
+        return of('idle');
       })
     );
   }
@@ -523,6 +557,91 @@ export class TaskDetailPanelComponent implements OnChanges {
       this.cdr.markForCheck();
     } catch (error) {
       console.error('Error removing dependency:', error);
+    }
+  }
+
+  // Execution control methods
+  async pauseExecution(): Promise<void> {
+    if (!this.task || this.isPausingExecution) return;
+    
+    this.isPausingExecution = true;
+    try {
+      await this.supabaseService.pauseTaskExecution(this.task._id);
+      this.cdr.markForCheck();
+    } catch (error) {
+      console.error('Error pausing execution:', error);
+      alert('Failed to pause execution. Please try again.');
+    } finally {
+      this.isPausingExecution = false;
+      this.cdr.markForCheck();
+    }
+  }
+
+  async resumeExecution(): Promise<void> {
+    if (!this.task || this.isResumingExecution) return;
+    
+    this.isResumingExecution = true;
+    try {
+      await this.supabaseService.resumeTaskExecution(this.task._id);
+      this.cdr.markForCheck();
+    } catch (error) {
+      console.error('Error resuming execution:', error);
+      alert('Failed to resume execution. Please try again.');
+    } finally {
+      this.isResumingExecution = false;
+      this.cdr.markForCheck();
+    }
+  }
+
+  async interruptExecution(): Promise<void> {
+    if (!this.task || this.isInterruptingExecution) return;
+    
+    if (!confirm('Are you sure you want to interrupt this task execution?')) {
+      return;
+    }
+    
+    this.isInterruptingExecution = true;
+    try {
+      await this.supabaseService.interruptTaskExecution(this.task._id, 'Interrupted by user');
+      this.cdr.markForCheck();
+    } catch (error) {
+      console.error('Error interrupting execution:', error);
+      alert('Failed to interrupt execution. Please try again.');
+    } finally {
+      this.isInterruptingExecution = false;
+      this.cdr.markForCheck();
+    }
+  }
+
+  getExecutionStateLabel(state: string): string {
+    switch (state) {
+      case 'running':
+        return 'Running';
+      case 'paused':
+        return 'Paused';
+      case 'waiting_input':
+        return 'Waiting for Input';
+      case 'completed':
+        return 'Completed';
+      case 'idle':
+      default:
+        return 'Idle';
+    }
+  }
+
+  getExecutionStateColor(state: string): string {
+    switch (state) {
+      case 'running':
+        return 'var(--color-status-active)';
+      case 'paused':
+        return 'var(--color-status-warning)';
+      case 'waiting_input':
+        return 'var(--color-status-warning)';
+      case 'completed':
+        return 'var(--color-status-success)';
+      case 'idle':
+      default:
+        return 'var(--color-neutral-500)';
     }
   }
 }

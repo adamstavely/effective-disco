@@ -4,6 +4,8 @@ import { SupabaseService } from '../../services/supabase.service';
 import { TenantSelectorComponent } from '../tenant-selector/tenant-selector.component';
 import { combineLatest, map, timer, Observable } from 'rxjs';
 import { LucideAngularModule } from 'lucide-angular';
+import { catchError } from 'rxjs/operators';
+import { of } from 'rxjs';
 
 @Component({
   selector: 'app-top-nav',
@@ -19,6 +21,9 @@ export class TopNavComponent {
   currentTime$: Observable<Date>;
   agentsActive$: Observable<number>;
   tasksInQueue$: Observable<number>;
+  proposalsToday$: Observable<number>;
+  missionsCompleted$: Observable<number>;
+  successRate$: Observable<number>;
 
   constructor(private supabaseService: SupabaseService) {
     this.currentTime$ = timer(0, 1000).pipe(
@@ -34,6 +39,27 @@ export class TopNavComponent {
       this.supabaseService.getTasks('assigned')
     ]).pipe(
       map(([inbox, assigned]) => inbox.length + assigned.length)
+    );
+
+    this.proposalsToday$ = this.supabaseService.getProposalsToday().pipe(
+      catchError((error) => {
+        console.error('Error loading proposals today:', error);
+        return of(0);
+      })
+    );
+
+    this.missionsCompleted$ = this.supabaseService.getCompletedMissions().pipe(
+      catchError((error) => {
+        console.error('Error loading completed missions:', error);
+        return of(0);
+      })
+    );
+
+    this.successRate$ = this.supabaseService.getSuccessRate().pipe(
+      catchError((error) => {
+        console.error('Error loading success rate:', error);
+        return of(0);
+      })
     );
   }
 
